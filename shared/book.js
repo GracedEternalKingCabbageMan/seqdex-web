@@ -57,9 +57,11 @@ function normalizeOffer(o) {
   } catch { return null; }
 }
 
-// The LNDEX surface: both legs Lightning, nothing else.
+// The LNDEX surface: both legs Lightning, nothing else. Offer families by
+// ln_direction (seqdex seqob-crosser/norm.go): 0/1 submarine, 2/3 pure LN,
+// 4/5 sub-asset. Only the pure family belongs here.
 export function pureLnOnly(offers) {
-  return offers.filter((o) => o.lnDirection === 2);
+  return offers.filter((o) => o.lnDirection === 2 || o.lnDirection === 3);
 }
 
 // price as a display number: quote units per base unit.
