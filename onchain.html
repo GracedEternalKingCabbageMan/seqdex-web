@@ -19,7 +19,7 @@
     while the maker is offline; cross-chain markets (quoted in BTC) settle through on-chain
     contracts on both chains, made safe by Bitcoin anchoring. OpenAMP restricted assets
     settle as policy-server co-signed transfers alongside the counterleg.
-    <span class="ribbon">preview · books live · filling ships next</span>
+    <b>Click an order to fill it.</b> Covenant and cross-chain fills arrive next.
   </div>
 
   <div class="trade-grid">
@@ -27,12 +27,15 @@
       <h2>Markets <span class="acc">·</span> on-chain</h2>
       <div id="mktList"></div>
     </div>
-    <div class="panel">
-      <h2 id="bookTitle">Order book</h2>
-      <table class="book">
-        <thead><tr><th>Price</th><th>Size (base)</th><th>Total (quote)</th><th>Expires</th></tr></thead>
-        <tbody id="bookBody"></tbody>
-      </table>
+    <div>
+      <div class="panel">
+        <h2 id="bookTitle">Order book</h2>
+        <table class="book">
+          <thead><tr><th>Price</th><th>Size (base)</th><th>Total (quote)</th><th>Expires</th></tr></thead>
+          <tbody id="bookBody"></tbody>
+        </table>
+      </div>
+      <div class="panel hide" id="ticketPanel" style="margin-top:16px"></div>
     </div>
     <div class="panel">
       <h2>Your wallet</h2>
@@ -45,7 +48,7 @@
   import { runTradePage } from './js/trade-page.js';
   await initChrome('onchain.html');
   footer();
-  await runTradePage({ mount: 'chain' });
+  await runTradePage({ mount: 'chain', fill: 'chain' });
 </script>
 </body>
 </html>

@@ -19,7 +19,7 @@
     with the published blinding key, and the trade lands as one blinded transaction.
     Sequentia assets only. Bitcoin has no confidential transactions, so there is no BTC leg
     in this room by construction.
-    <span class="ribbon">preview · book opens with the first blinded offer</span>
+    <b>Click an order to fill it</b>; the book opens with the first blinded offer.
   </div>
 
   <div class="trade-grid">
@@ -27,12 +27,15 @@
       <h2>Markets <span class="acc">·</span> confidential</h2>
       <div id="mktList"></div>
     </div>
-    <div class="panel">
-      <h2 id="bookTitle">Order book</h2>
-      <table class="book">
-        <thead><tr><th>Price</th><th>Size (base)</th><th>Total (quote)</th><th>Expires</th></tr></thead>
-        <tbody id="bookBody"></tbody>
-      </table>
+    <div>
+      <div class="panel">
+        <h2 id="bookTitle">Order book</h2>
+        <table class="book">
+          <thead><tr><th>Price</th><th>Size (base)</th><th>Total (quote)</th><th>Expires</th></tr></thead>
+          <tbody id="bookBody"></tbody>
+        </table>
+      </div>
+      <div class="panel hide" id="ticketPanel" style="margin-top:16px"></div>
     </div>
     <div class="panel">
       <h2>Your wallet</h2>
@@ -45,7 +48,7 @@
   import { runTradePage } from './js/trade-page.js';
   await initChrome('confidential.html');
   footer();
-  await runTradePage({ mount: 'conf', confOnly: true });
+  await runTradePage({ mount: 'conf', confOnly: true, fill: 'conf' });
 </script>
 </body>
 </html>
