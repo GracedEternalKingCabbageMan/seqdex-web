@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Channel marketplace · SeqDEX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/tokens.css">
+</head>
+<body class="surface-ln">
+<div class="wrap">
+  <header class="topbar"></header>
+
+  <div class="rules">
+    <b>Inbound liquidity is the LNDEX entry ticket.</b> You cannot receive an asset over
+    Lightning without inbound capacity in that asset, so a buyer on the LNDEX needs inbound
+    capacity in the asset they are buying before the trade can settle. This page shows your
+    per-asset channel state and sells you the capacity you are missing.
+  </div>
+
+  <div class="trade-grid" style="grid-template-columns: 1fr 340px">
+    <div class="panel">
+      <h2>Your channels</h2>
+      <p class="sub" id="chanIntro">Connect the wallet to see your Lightning channels.</p>
+      <table class="book" id="chanTable" style="margin-top:10px">
+        <thead><tr><th>Asset</th><th>Channel</th><th>Spendable</th><th>Receivable</th></tr></thead>
+        <tbody id="chanBody"></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h2>Buy inbound capacity</h2>
+      <p class="sub">Provided just-in-time by the LSP: your wallet asks for capacity toward
+      its own hosted node, and a channel is opened or extended to carry it. Your device
+      co-signs everything; the LSP can route but never move your funds.</p>
+      <label class="lbl" for="inAsset">Asset</label>
+      <select id="inAsset"></select>
+      <label class="lbl" for="inAmt">Capacity to receive (in asset units)</label>
+      <input id="inAmt" inputmode="decimal" placeholder="0.0">
+      <button id="btnInbound" class="btn" style="margin-top:14px">Request inbound capacity</button>
+      <div id="inStatus" class="status"></div>
+      <p class="sub faint" style="margin-top:16px">Peer-to-peer channel offers (sellers
+      posting priced capacity) arrive in a later milestone; this page will carry that book.</p>
+    </div>
+  </div>
+</div>
+<script type="module" src="js/channels.js"></script>
+</body>
+</html>
