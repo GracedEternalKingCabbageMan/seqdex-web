@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LNDEX · SeqDEX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/tokens.css">
+</head>
+<body class="surface-ln">
+<div class="wrap">
+  <header class="topbar"></header>
+
+  <div class="rules">
+    <b>LNDEX settles purely over Lightning.</b> Both legs of every trade travel through
+    Lightning channels: yours and the maker's, on both assets. No submarine legs, nothing
+    on-chain, so a settled trade is instant and final. To buy an asset here you need
+    <b>inbound</b> capacity in that asset; to sell, <b>spendable</b> capacity.
+    Cross-chain BTC trades run over Bitcoin testnet4 Lightning the same way.
+    <span class="ribbon">preview · books live · filling ships next</span>
+  </div>
+
+  <div class="trade-grid">
+    <div class="panel">
+      <h2>Markets <span class="acc">·</span> pure Lightning</h2>
+      <div id="mktList"></div>
+    </div>
+    <div class="panel">
+      <h2 id="bookTitle">Order book</h2>
+      <table class="book">
+        <thead><tr><th>Price</th><th>Size (base)</th><th>Total (quote)</th><th>Expires</th></tr></thead>
+        <tbody id="bookBody"></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h2>Your wallet</h2>
+      <div id="walletPanel"></div>
+    </div>
+  </div>
+</div>
+<script type="module">
+  import { initChrome, footer } from './shared/app.js';
+  import { runTradePage } from './js/trade-page.js';
+  await initChrome('lndex.html');
+  footer();
+  await runTradePage({ mount: 'ln', lnOnly: true, wantChannels: true });
+</script>
+</body>
+</html>

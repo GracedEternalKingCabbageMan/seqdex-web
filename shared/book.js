@@ -1,0 +1,71 @@
+// Relay book client. Each surface reads its own mount; there is no unified
+// book by design.
+//   LNDEX        -> /seqob-pln  (only offers with lightning.ln_direction == 2)
+//   On-chain DEX -> /seqob      (same-chain, covenant, cross-chain BTC)
+//   Confidential -> /seqob-conf (markets with pair.confidential == true)
+import { BASE } from './meta.js';
+
+export const MOUNTS = {
+  ln: BASE + '/seqob-pln',
+  chain: BASE + '/seqob',
+  conf: BASE + '/seqob-conf',
+  chan: BASE + '/seqob-chan',
+};
+
+async function getJSON(url) {
+  const r = await fetch(url, { cache: 'no-store' });
+  if (!r.ok) throw new Error('relay HTTP ' + r.status);
+  return await r.json();
+}
+
+export async function markets(mount) {
+  const j = await getJSON(MOUNTS[mount] + '/v1/markets');
+  return (j.markets || []).map((m) => ({
+    base: m.pair.base_asset, quote: m.pair.quote_asset,
+    confidential: !!m.pair.confidential,
+    bestBid: m.best_bid, bestAsk: m.best_ask, last: m.last_price,
+    nOrders: Number(m.n_orders || 0),
+  }));
+}
+
+export async function orderbook(mount, base, quote) {
+  const j = await getJSON(`${MOUNTS[mount]}/v1/market/${encodeURIComponent(base)}/${encodeURIComponent(quote)}/orderbook`);
+  return (j.offers || []).map(normalizeOffer).filter(Boolean);
+}
+
+// One offer, normalized for display. Prices are quote-atoms per base-unit,
+// computed from the authenticated amounts, never from relay summary fields.
+function normalizeOffer(o) {
+  try {
+    const baseAmt = BigInt(o.base_amount);
+    if (baseAmt <= 0n) return null;
+    const isBid = o.trade_dir === 'TRADE_DIR_BUY';           // maker buys base = a bid
+    const quoteAmt = BigInt(isBid ? o.offer_amount : o.want_amount);
+    return {
+      id: o.offer_id,
+      side: isBid ? 'bid' : 'ask',
+      baseAtoms: baseAmt,
+      quoteAtoms: quoteAmt,
+      partial: !!o.allow_partial,
+      expiresAt: Number(o.expires_at_unix || 0),
+      maker: o.maker_pubkey,
+      lnDirection: o.lightning ? Number(o.lightning.ln_direction ?? -1) : null,
+      confidential: !!o.confidential,
+      covenant: !!o.covenant,
+      raw: o,
+    };
+  } catch { return null; }
+}
+
+// The LNDEX surface: both legs Lightning, nothing else.
+export function pureLnOnly(offers) {
+  return offers.filter((o) => o.lnDirection === 2);
+}
+
+// price as a display number: quote units per base unit.
+export function priceOf(o, basePrec, quotePrec) {
+  const b = Number(o.baseAtoms) / Math.pow(10, basePrec);
+  const q = Number(o.quoteAtoms) / Math.pow(10, quotePrec);
+  if (!(b > 0)) return 0;
+  return q / b;
+}

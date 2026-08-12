@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>On-chain DEX · SeqDEX</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/tokens.css">
+</head>
+<body class="surface-chain">
+<div class="wrap">
+  <header class="topbar"></header>
+
+  <div class="rules">
+    <b>The on-chain DEX settles on the chain, atomically.</b> Same-chain swaps exchange
+    Sequentia assets in one transaction; funded covenant orders rest on-chain and fill even
+    while the maker is offline; cross-chain markets (quoted in BTC) settle through on-chain
+    contracts on both chains, made safe by Bitcoin anchoring. OpenAMP restricted assets
+    settle as policy-server co-signed transfers alongside the counterleg.
+    <span class="ribbon">preview · books live · filling ships next</span>
+  </div>
+
+  <div class="trade-grid">
+    <div class="panel">
+      <h2>Markets <span class="acc">·</span> on-chain</h2>
+      <div id="mktList"></div>
+    </div>
+    <div class="panel">
+      <h2 id="bookTitle">Order book</h2>
+      <table class="book">
+        <thead><tr><th>Price</th><th>Size (base)</th><th>Total (quote)</th><th>Expires</th></tr></thead>
+        <tbody id="bookBody"></tbody>
+      </table>
+    </div>
+    <div class="panel">
+      <h2>Your wallet</h2>
+      <div id="walletPanel"></div>
+    </div>
+  </div>
+</div>
+<script type="module">
+  import { initChrome, footer } from './shared/app.js';
+  import { runTradePage } from './js/trade-page.js';
+  await initChrome('onchain.html');
+  footer();
+  await runTradePage({ mount: 'chain' });
+</script>
+</body>
+</html>

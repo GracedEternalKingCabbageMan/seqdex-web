@@ -1,0 +1,172 @@
+/* SeqDEX design tokens + shared chassis.
+   One dark chassis; each surface carries its accent (informational, not
+   decorative: it encodes the settlement world you are standing in).
+   LNDEX + Channels: violet · On-chain: gold · Confidential: teal. */
+:root {
+  --bg: #0b0c0f; --panel: #14161c; --panel2: #191c24; --line: #262b35;
+  --txt: #e9ecf1; --dim: #97a0ae; --faint: #5c6470;
+  --gold: #ffc629; --violet: #9d7bff; --teal: #2dd4bf;
+  --green: #3ddc84; --red: #ff6b7a;
+  --accent: var(--gold);
+  --disp: 'Space Grotesk', system-ui, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+}
+.surface-ln   { --accent: var(--violet); }
+.surface-chain{ --accent: var(--gold); }
+.surface-conf { --accent: var(--teal); }
+
+* { box-sizing: border-box; margin: 0; }
+html { scrollbar-color: var(--line) var(--bg); }
+body {
+  background: var(--bg); color: var(--txt);
+  font: 15px/1.55 var(--disp);
+  min-height: 100vh;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+button { font-family: var(--disp); cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 22px 70px; }
+
+/* topbar */
+.topbar {
+  display: flex; align-items: center; gap: 26px;
+  padding: 16px 0; margin-bottom: 26px;
+  border-bottom: 1px solid var(--line);
+}
+.wordmark { display: flex; align-items: baseline; gap: 9px; font-weight: 700; font-size: 19px; letter-spacing: .4px; color: var(--txt); }
+.wordmark:hover { text-decoration: none; }
+.wordmark .dot { width: 11px; height: 11px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 10px rgba(255,198,41,.55); align-self: center; }
+.wordmark small { color: var(--faint); font-weight: 500; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+.nav { display: flex; gap: 4px; flex-wrap: wrap; }
+.nav a {
+  color: var(--dim); padding: 7px 12px; border-radius: 8px;
+  font-size: 13.5px; font-weight: 600; border-bottom: 2px solid transparent;
+}
+.nav a:hover { color: var(--txt); text-decoration: none; }
+.nav a.on { color: var(--txt); border-bottom-color: var(--nav-accent, var(--accent)); border-radius: 8px 8px 0 0; }
+.nav a[data-s="ln"]   { --nav-accent: var(--violet); }
+.nav a[data-s="chain"]{ --nav-accent: var(--gold); }
+.nav a[data-s="conf"] { --nav-accent: var(--teal); }
+.spacer { flex: 1; }
+
+.connect-btn {
+  border: 1px solid var(--line); background: var(--panel); color: var(--txt);
+  border-radius: 999px; padding: 8px 16px; font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
+}
+.connect-btn:hover { border-color: var(--accent); }
+.connect-btn .st { width: 8px; height: 8px; border-radius: 50%; background: var(--faint); }
+.connect-btn.ok .st { background: var(--green); }
+.connect-btn .addr { font-family: var(--mono); font-size: 12px; color: var(--dim); }
+
+/* panels */
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+.panel h2 { font-size: 15px; font-weight: 700; margin-bottom: 10px; }
+.panel h2 .acc { color: var(--accent); }
+.sub { color: var(--dim); font-size: 13px; }
+.faint { color: var(--faint); }
+.mono { font-family: var(--mono); }
+
+/* surface banner: the rules of the room */
+.rules {
+  border-left: 3px solid var(--accent);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 7%, transparent), transparent 65%);
+  border-radius: 4px 12px 12px 4px;
+  padding: 13px 16px; margin-bottom: 20px;
+  font-size: 13.5px; color: var(--dim);
+}
+.rules b { color: var(--txt); }
+
+/* layout grid for trading pages */
+.trade-grid { display: grid; grid-template-columns: 300px 1fr 290px; gap: 16px; align-items: start; }
+@media (max-width: 980px) { .trade-grid { grid-template-columns: 1fr; } }
+
+/* markets list */
+.mkt { display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left;
+  background: none; border: 0; border-radius: 8px; padding: 9px 10px; color: var(--txt); font-size: 13.5px; }
+.mkt:hover { background: var(--panel2); }
+.mkt.on { background: var(--panel2); box-shadow: inset 2px 0 0 var(--accent); }
+.mkt .pair { font-weight: 700; }
+.mkt .n { margin-left: auto; color: var(--faint); font-family: var(--mono); font-size: 11.5px; }
+
+/* order book */
+table.book { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12.5px; }
+table.book th { text-align: right; color: var(--faint); font-weight: 500; font-size: 11px;
+  text-transform: uppercase; letter-spacing: .08em; padding: 4px 10px; border-bottom: 1px solid var(--line); }
+table.book td { text-align: right; padding: 4px 10px; white-space: nowrap; }
+table.book th:first-child, table.book td:first-child { text-align: left; }
+td.ask { color: var(--red); } td.bid { color: var(--green); }
+tr.spread td { color: var(--faint); font-size: 11px; border-top: 1px dashed var(--line); border-bottom: 1px dashed var(--line); padding: 6px 10px; }
+
+/* wallet side panel */
+.wrow { display: flex; align-items: baseline; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.wrow:last-child { border-bottom: 0; }
+.wrow .tk { font-weight: 700; max-width: 88px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wrow .amt { margin-left: auto; font-family: var(--mono); font-size: 12.5px; }
+.wrow .sub2 { font-size: 11px; color: var(--faint); font-family: var(--mono); }
+
+.btn {
+  border: 0; border-radius: 9px; padding: 10px 16px; font-weight: 700; font-size: 13.5px;
+  background: var(--accent); color: #101014;
+}
+.btn:hover { filter: brightness(1.08); }
+.btn:disabled { opacity: .45; cursor: default; }
+.btn.ghost { background: transparent; color: var(--txt); border: 1px solid var(--line); }
+.btn.ghost:hover { border-color: var(--accent); filter: none; }
+
+input, select {
+  width: 100%; background: var(--panel2); color: var(--txt); border: 1px solid var(--line);
+  border-radius: 9px; padding: 9px 11px; font-size: 13.5px; font-family: var(--disp); margin-top: 6px;
+}
+input:focus, select:focus { outline: none; border-color: var(--accent); }
+label.lbl { display: block; margin-top: 12px; font-size: 12px; color: var(--dim); }
+
+.status { margin-top: 10px; font-size: 12.5px; color: var(--dim); min-height: 17px; }
+.status.err { color: var(--red); }
+.status.ok { color: var(--green); }
+.hide { display: none !important; }
+
+/* preview ribbon (P0 honesty) */
+.ribbon {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 11px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700;
+  color: var(--accent); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 999px; padding: 3px 10px; margin-left: 10px; vertical-align: middle;
+}
+
+/* index tiles */
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 30px; }
+@media (max-width: 800px) { .tiles { grid-template-columns: 1fr; } }
+.tile {
+  position: relative; display: block; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 16px; padding: 22px 22px 20px 26px; color: var(--txt);
+  transition: transform .09s ease, border-color .15s ease;
+  overflow: hidden;
+}
+.tile::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--t-acc); }
+.tile:hover { transform: translateY(-2px); border-color: var(--t-acc); text-decoration: none; }
+.tile h3 { font-size: 19px; letter-spacing: .2px; }
+.tile h3 small { color: var(--t-acc); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; display: block; margin-bottom: 6px; }
+.tile p { color: var(--dim); font-size: 13.5px; margin-top: 8px; }
+.tile .live { margin-top: 14px; font-family: var(--mono); font-size: 12px; color: var(--faint); }
+.tile .live b { color: var(--t-acc); font-weight: 600; }
+.tile-ln   { --t-acc: var(--violet); }
+.tile-chain{ --t-acc: var(--gold); }
+.tile-conf { --t-acc: var(--teal); }
+.tile-chan { --t-acc: var(--violet); }
+
+.hero { margin: 44px 0 8px; max-width: 640px; }
+.hero h1 { font-size: 40px; line-height: 1.12; letter-spacing: -.015em; }
+.hero h1 .g { color: var(--gold); }
+.hero p { margin-top: 14px; color: var(--dim); font-size: 16px; }
+
+.foot { margin-top: 60px; padding-top: 18px; border-top: 1px solid var(--line);
+  color: var(--faint); font-size: 12.5px; display: flex; gap: 18px; flex-wrap: wrap; }
+.foot a { color: var(--dim); }
+
+@media (prefers-reduced-motion: reduce) {
+  .tile { transition: none; }
+  .tile:hover { transform: none; }
+}
