@@ -9,10 +9,19 @@ export function pairLabel(m) {
   return assetMeta(m.base).ticker + ' / ' + (m.quote === 'BTC' ? 'BTC' : assetMeta(m.quote).ticker);
 }
 
-export async function runTradePage({ mount, lnOnly = false, confOnly = false, wantChannels = false }) {
+export async function runTradePage({ mount, lnOnly = false, confOnly = false, wantChannels = false, fill = null }) {
   let mkts = [];
   let current = null;
   let timer = null;
+  let ticketOffer = null;
+
+  // Wallet-side progress during a fill (the extension streams it).
+  if (P.hasWallet()) {
+    try { window.sequentia.on('dexProgress', (d) => {
+      const st = $('ticketStatus');
+      if (st && d && d.text) { st.className = 'status'; st.textContent = d.text; }
+    }); } catch {}
+  }
 
   async function loadMarkets() {
     const list = $('mktList');
@@ -44,6 +53,9 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
 
   async function select(m, btn) {
     current = m;
+    ticketOffer = null;
+    const tp = $('ticketPanel');
+    if (tp) { tp.classList.add('hide'); tp.innerHTML = ''; }
     for (const x of document.querySelectorAll('.mkt')) x.classList.remove('on');
     if (btn) btn.classList.add('on');
     $('bookTitle').textContent = pairLabel(m);
@@ -73,6 +85,13 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
         const ex = el('td', null, o.expiresAt ? rel(o.expiresAt) : '—');
         ex.style.color = 'var(--faint)';
         tr.appendChild(ex);
+        if (fill && !o.covenant) {
+          tr.style.cursor = 'pointer';
+          tr.title = 'Fill this order';
+          tr.onclick = () => openTicket(o);
+          tr.onmouseenter = () => { tr.style.background = 'var(--panel2)'; };
+          tr.onmouseleave = () => { tr.style.background = ''; };
+        }
         return tr;
       };
       // asks render top-down from worst to best so the spread sits in the middle
@@ -165,6 +184,111 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
       }
       box.appendChild(hint);
     }
+  }
+
+  // ---- fill ticket ----
+  const big = (v) => BigInt(v ?? 0);
+  const ceilDiv = (a, b) => (a + b - 1n) / b;
+
+  function parseBaseAmt(str, prec) {
+    str = (str || '').trim();
+    if (!/^\d+(\.\d+)?$/.test(str)) throw new Error('enter a valid amount');
+    const [i, f = ''] = str.split('.');
+    if (f.length > prec) throw new Error('max ' + prec + ' decimals');
+    return BigInt(i) * 10n ** BigInt(prec) + BigInt((f + '0'.repeat(prec)).slice(0, prec) || '0');
+  }
+
+  // Preview mirror of the wallet's math (the wallet recomputes from the relay
+  // and its numbers are the ones on the approval sheet).
+  function previewFill(o, takeBase) {
+    let take = takeBase;
+    if (take < 1n) take = 1n;
+    if (take > o.baseAtoms) take = o.baseAtoms;
+    const quote = o.side === 'ask' ? ceilDiv(o.quoteAtoms * take, o.baseAtoms)   // you pay quote
+                                   : (o.quoteAtoms * take) / o.baseAtoms;        // you receive quote
+    return { take, quote, whole: take >= o.baseAtoms };
+  }
+
+  function openTicket(o) {
+    ticketOffer = o;
+    const box = $('ticketPanel');
+    box.classList.remove('hide');
+    box.innerHTML = '';
+    const bm = assetMeta(current.base);
+    const qm = current.quote === 'BTC' ? { ticker: 'BTC', precision: 8 } : assetMeta(current.quote);
+    const youBuy = o.side === 'ask';   // taking an ask = you buy base; taking a bid = you sell base
+    box.appendChild(el('h2', null, (youBuy ? 'Buy ' : 'Sell ') + bm.ticker + (youBuy ? ' with ' : ' for ') + qm.ticker));
+    const lbl = el('label', 'lbl', 'Amount (' + bm.ticker + ') · offer size ' + fmtAtoms(o.baseAtoms, bm.precision));
+    lbl.htmlFor = 'ticketAmt';
+    box.appendChild(lbl);
+    const inp = el('input', 'mono'); inp.id = 'ticketAmt';
+    inp.value = fmtAtoms(o.baseAtoms, bm.precision);
+    box.appendChild(inp);
+    const prev = el('p', 'sub'); prev.id = 'ticketPreview'; prev.style.marginTop = '8px';
+    box.appendChild(prev);
+    const btn = el('button', 'btn', youBuy ? 'Buy ' + bm.ticker : 'Sell ' + bm.ticker);
+    btn.id = 'ticketGo'; btn.style.marginTop = '12px';
+    box.appendChild(btn);
+    const st = el('div', 'status'); st.id = 'ticketStatus';
+    box.appendChild(st);
+    if (!o.partial) inp.disabled = true;
+
+    const repaint = () => {
+      try {
+        const take = o.partial ? parseBaseAmt(inp.value, bm.precision) : o.baseAtoms;
+        const pv = previewFill(o, take);
+        prev.textContent = (youBuy
+          ? 'You pay ≈ ' + fmtAtoms(pv.quote, qm.precision) + ' ' + qm.ticker + ' and receive ' + fmtAtoms(pv.take, bm.precision) + ' ' + bm.ticker
+          : 'You give ' + fmtAtoms(pv.take, bm.precision) + ' ' + bm.ticker + ' and receive ≈ ' + fmtAtoms(pv.quote, qm.precision) + ' ' + qm.ticker)
+          + (pv.whole ? ' (the whole offer)' : ' (partial, at the offer’s exact ratio)')
+          + '. Exact amounts are confirmed in the wallet approval.';
+        btn.disabled = false;
+        return pv;
+      } catch (e) { prev.textContent = e.message; btn.disabled = true; return null; }
+    };
+    inp.addEventListener('input', repaint);
+    repaint();
+
+    btn.onclick = async () => {
+      st.className = 'status'; st.textContent = '';
+      if (!P.account()) {
+        try { await P.connect(); } catch (e) { st.className = 'status err'; st.textContent = e.message; return; }
+      }
+      const pv = repaint();
+      if (!pv) return;
+      btn.disabled = true;
+      st.textContent = 'Waiting for wallet approval…';
+      try {
+        let res;
+        if (fill === 'ln') {
+          res = await P.request('dexSwapLn', {
+            base: current.base, quote: current.quote, offerId: o.id,
+            takeAtoms: pv.whole ? undefined : pv.take.toString(),
+          });
+          st.className = 'status ok';
+          st.textContent = 'Settled over Lightning: ' +
+            (youBuy ? 'received ' + fmtAtoms(big(res.baseAtoms), bm.precision) + ' ' + bm.ticker
+                    : 'received ' + fmtAtoms(big(res.quoteAtoms), qm.precision) + ' ' + qm.ticker) +
+            '. Instant and final.';
+        } else {
+          res = await P.request('dexFillOnchain', {
+            mount: fill === 'conf' ? 'conf' : 'chain',
+            base: current.base, quote: current.quote, offerId: o.id,
+            takeBase: pv.take.toString(),
+          });
+          st.className = 'status ok';
+          st.textContent = 'Filled. Swap transaction ' + (res.txid ? res.txid.slice(0, 16) + '…' : 'broadcast') +
+            ' — settles in about a block.';
+        }
+        refreshBook();
+        loadWallet();
+      } catch (e) {
+        st.className = 'status err';
+        st.textContent = 'Fill failed: ' + e.message;
+      } finally {
+        btn.disabled = false;
+      }
+    };
   }
 
   P.onAccountChange(() => loadWallet());

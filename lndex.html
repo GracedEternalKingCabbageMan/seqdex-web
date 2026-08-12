@@ -19,7 +19,7 @@
     on-chain, so a settled trade is instant and final. To buy an asset here you need
     <b>inbound</b> capacity in that asset; to sell, <b>spendable</b> capacity.
     Cross-chain BTC trades run over Bitcoin testnet4 Lightning the same way.
-    <span class="ribbon">preview · books live · filling ships next</span>
+    <b>Click an order to fill it.</b>
   </div>
 
   <div class="trade-grid">
@@ -27,12 +27,15 @@
       <h2>Markets <span class="acc">·</span> pure Lightning</h2>
       <div id="mktList"></div>
     </div>
-    <div class="panel">
-      <h2 id="bookTitle">Order book</h2>
-      <table class="book">
-        <thead><tr><th>Price</th><th>Size (base)</th><th>Total (quote)</th><th>Expires</th></tr></thead>
-        <tbody id="bookBody"></tbody>
-      </table>
+    <div>
+      <div class="panel">
+        <h2 id="bookTitle">Order book</h2>
+        <table class="book">
+          <thead><tr><th>Price</th><th>Size (base)</th><th>Total (quote)</th><th>Expires</th></tr></thead>
+          <tbody id="bookBody"></tbody>
+        </table>
+      </div>
+      <div class="panel hide" id="ticketPanel" style="margin-top:16px"></div>
     </div>
     <div class="panel">
       <h2>Your wallet</h2>
@@ -45,7 +48,7 @@
   import { runTradePage } from './js/trade-page.js';
   await initChrome('lndex.html');
   footer();
-  await runTradePage({ mount: 'ln', lnOnly: true, wantChannels: true });
+  await runTradePage({ mount: 'ln', lnOnly: true, wantChannels: true, fill: 'ln' });
 </script>
 </body>
 </html>
