@@ -23,7 +23,7 @@ contract (surfaces, books, settlement phases, provider dependencies).
 
 ## Deploy
 
-Box clone `/root/sequentia/seqdex-web`; Caddy serves it via `handle_path
+Box clone `/srv/seqdex-web` (must live outside /root: Caddy's file_server runs as the caddy user and cannot traverse /root); Caddy serves it via `handle_path
 /dex/*` + `file_server` (Caddyfile on the box, backup before editing,
 `caddy validate` + `systemctl reload caddy`). Flow: commit → push →
 `git pull` on the box. Nothing to build.
