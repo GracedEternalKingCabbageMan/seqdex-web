@@ -85,9 +85,9 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
         const ex = el('td', null, o.expiresAt ? rel(o.expiresAt) : '—');
         ex.style.color = 'var(--faint)';
         tr.appendChild(ex);
-        if (fill && !o.covenant) {
+        if (fill) {
           tr.style.cursor = 'pointer';
-          tr.title = 'Fill this order';
+          tr.title = o.covenant ? 'Fill this covenant order (maker can be offline; chain-enforced)' : 'Fill this order';
           tr.onclick = () => openTicket(o);
           tr.onmouseenter = () => { tr.style.background = 'var(--panel2)'; };
           tr.onmouseleave = () => { tr.style.background = ''; };
