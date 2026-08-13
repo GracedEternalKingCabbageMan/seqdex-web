@@ -266,6 +266,22 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
             base: current.base, quote: current.quote, offerId: o.id,
             takeAtoms: pv.whole ? undefined : pv.take.toString(),
           });
+          if (res.jobId) {
+            // The swap runs as a wallet job that survives anything; poll it.
+            st.className = 'status';
+            st.textContent = 'Swap running in your wallet…';
+            const deadline = Date.now() + 12 * 60_000;
+            for (;;) {
+              await new Promise((r) => setTimeout(r, 4000));
+              const jr = await P.request('dexJobResult', { jobId: res.jobId }).catch(() => ({ done: false }));
+              if (jr.done) {
+                if (!jr.ok) throw new Error(jr.error || 'swap failed');
+                res = jr.result;
+                break;
+              }
+              if (Date.now() > deadline) throw new Error('the swap is taking unusually long; check your balances before retrying');
+            }
+          }
           st.className = 'status ok';
           st.textContent = 'Settled over Lightning: ' +
             (youBuy ? 'received ' + fmtAtoms(big(res.baseAtoms), bm.precision) + ' ' + bm.ticker
