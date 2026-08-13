@@ -29,7 +29,9 @@ export async function markets(mount) {
 }
 
 export async function orderbook(mount, base, quote) {
-  const j = await getJSON(`${MOUNTS[mount]}/v1/market/${encodeURIComponent(base)}/${encodeURIComponent(quote)}/orderbook`);
+  // The blinded book is a separate namespace on its relay, selected by query.
+  const q = mount === 'conf' ? '?confidential=1' : '';
+  const j = await getJSON(`${MOUNTS[mount]}/v1/market/${encodeURIComponent(base)}/${encodeURIComponent(quote)}/orderbook${q}`);
   return (j.offers || []).map(normalizeOffer).filter(Boolean);
 }
 
