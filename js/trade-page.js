@@ -27,7 +27,8 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
     const list = $('mktList');
     try {
       mkts = await markets(mount);
-      if (confOnly) mkts = mkts.filter((m) => m.confidential);
+      // The conf mount IS the blinded namespace (its market summaries do not
+      // carry the flag); offers are still filtered per-offer below.
       list.innerHTML = '';
       if (!mkts.length) {
         list.appendChild(el('p', 'sub', confOnly
