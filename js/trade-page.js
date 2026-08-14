@@ -239,7 +239,11 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
     box.innerHTML = '';
     const bm = assetMeta(current.base);
     const qm = current.quote === 'BTC' ? { ticker: 'BTC', precision: 8 } : assetMeta(current.quote);
-    box.appendChild(el('h2', null, 'Market order'));
+    const modes = el('div'); modes.style.display = 'flex'; modes.style.gap = '10px'; modes.style.alignItems = 'baseline';
+    const h = el('h2', null, 'Market order');
+    const tab = el('a', null, 'switch to limit'); tab.href = '#'; tab.style.fontSize = '12px';
+    modes.appendChild(h); modes.appendChild(tab); box.appendChild(modes);
+    let mode = 'market';
     const row = el('div'); row.style.display = 'flex'; row.style.gap = '8px'; row.style.margin = '6px 0 10px';
     const bBuy = el('button', 'btn', 'Buy ' + bm.ticker);
     const bSell = el('button', 'btn', 'Sell ' + bm.ticker);
@@ -251,8 +255,23 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
     const lbl = el('label', 'lbl', 'Amount (' + bm.ticker + ') · walks the book across resting orders, one wallet approval');
     box.appendChild(lbl);
     const inp = el('input', 'mono'); box.appendChild(inp);
+    const plbl = el('label', 'lbl', 'Limit price (' + qm.ticker + ' per ' + bm.ticker + ') · fills what crosses, rests the remainder');
+    const pinp = el('input', 'mono');
+    plbl.style.display = 'none'; pinp.style.display = 'none';
+    box.appendChild(plbl); box.appendChild(pinp);
     const go = el('button', 'btn', 'Place market order'); go.style.marginTop = '10px';
     box.appendChild(go);
+    tab.onclick = (ev) => {
+      ev.preventDefault();
+      mode = mode === 'market' ? 'limit' : 'market';
+      h.textContent = mode === 'market' ? 'Market order' : 'Limit order';
+      tab.textContent = mode === 'market' ? 'switch to limit' : 'switch to market';
+      plbl.style.display = pinp.style.display = mode === 'limit' ? '' : 'none';
+      lbl.textContent = 'Amount (' + bm.ticker + ')' + (mode === 'limit'
+        ? ' · your order rests until matched, served live by your wallet'
+        : ' · walks the book across resting orders, one wallet approval');
+      go.textContent = mode === 'market' ? 'Place market order' : 'Place limit order';
+    };
     const st = el('div', 'status'); box.appendChild(st);
     go.onclick = async () => {
       st.className = 'status'; st.textContent = '';
@@ -264,13 +283,31 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
       go.disabled = true;
       st.textContent = 'Waiting for wallet approval…';
       try {
-        let res = await P.request('dexMarketOrder', { room: 'ln', base: current.base, quote: current.quote, side, baseAtoms: atoms.toString() });
+        let res;
+        if (mode === 'limit') {
+          const px = Number(pinp.value);
+          if (!(px > 0)) throw new Error('enter a limit price');
+          const qprec = qm.precision ?? 8;
+          const baseUnits = Number(atoms) / Math.pow(10, bm.precision ?? 8);
+          const limitQuoteAtoms = Math.round(baseUnits * px * Math.pow(10, qprec));
+          if (!(limitQuoteAtoms > 0)) throw new Error('price times amount rounds to zero');
+          res = await P.request('dexPlaceLimit', { room: 'ln', base: current.base, quote: current.quote, side, baseAtoms: atoms.toString(), limitQuoteAtoms: String(limitQuoteAtoms) });
+        } else {
+          res = await P.request('dexMarketOrder', { room: 'ln', base: current.base, quote: current.quote, side, baseAtoms: atoms.toString() });
+        }
         if (res.jobId) {
-          st.textContent = 'Market order running in your wallet…';
-          const deadline = Date.now() + 20 * 60_000;
+          st.textContent = mode === 'limit' ? 'Order placed; your wallet is serving it…' : 'Market order running in your wallet…';
+          const deadline = Date.now() + (mode === 'limit' ? 12 * 60 * 60_000 : 20 * 60_000);
           for (;;) {
             await new Promise((r) => setTimeout(r, 4000));
             const jr = await P.request('dexJobResult', { jobId: res.jobId }).catch(() => ({ done: false }));
+            if (jr.resting) {
+              st.className = 'status ok';
+              st.textContent = 'Resting on the book (' + fmtAtoms(big(jr.remaining || '0'), bm.precision) + ' ' + bm.ticker +
+                ' remaining' + (Number(jr.filledAtoms || 0) > 0 ? ', ' + fmtAtoms(big(jr.filledAtoms), bm.precision) + ' filled so far' : '') +
+                '). Served live by your wallet; keep this browser open.';
+              refreshBook();
+            }
             if (jr.done) {
               if (!jr.ok) throw new Error(jr.error || 'no slice settled');
               res = jr.result;
