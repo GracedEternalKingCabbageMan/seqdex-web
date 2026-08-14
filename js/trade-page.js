@@ -1,7 +1,7 @@
 // Shared trading-page driver: markets list, order book, wallet panel.
 // Each surface page instantiates it with its mount and its own rules.
 import { $, el } from '../shared/app.js';
-import { assetMeta, fmtAtoms } from '../shared/meta.js';
+import { assetMeta, fmtAtoms, assetSupervised, supervisionNote } from '../shared/meta.js';
 import { markets, orderbook, priceOf, pureLnOnly } from '../shared/book.js';
 import * as P from '../shared/provider.js';
 
@@ -40,6 +40,14 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
       for (const m of mkts) {
         const b = el('button', 'mkt');
         b.appendChild(el('span', 'pair', pairLabel(m)));
+        // A trader is about to ACQUIRE this asset, so say up front if its issuer
+        // can freeze it. Settlement in flight is never caught: a freeze reaches
+        // ordinary addresses, not channels, HTLCs or covenants.
+        if (assetSupervised(m.base) || assetSupervised(m.quote)) {
+          const sup = el('span', 'sup', '⊘');
+          sup.title = supervisionNote(assetSupervised(m.base) ? m.base : m.quote);
+          b.appendChild(sup);
+        }
         if (m.quote === 'BTC') { const x = el('span', 'sub2', '· cross-chain'); x.style.cssText = 'font-size:11px;color:var(--faint)'; b.appendChild(x); }
         b.appendChild(el('span', 'n', m.nOrders + ' ord'));
         b.onclick = () => select(m, b);
@@ -155,7 +163,12 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
       const meta = assetMeta(s.hex);
       const atoms = s.hex === 'BTC' ? (balances.btc || '0') : (balances.assets[s.hex] || '0');
       const r = el('div', 'wrow');
-      const tk = el('span', 'tk', meta.ticker); tk.title = meta.name; r.appendChild(tk);
+      const tk = el('span', 'tk', meta.ticker);
+      tk.title = assetSupervised(s.hex) ? (meta.name + ' — ' + supervisionNote(s.hex)) : meta.name;
+      r.appendChild(tk);
+      if (assetSupervised(s.hex)) {
+        const sup = el('span', 'sup', '⊘'); sup.title = supervisionNote(s.hex); r.appendChild(sup);
+      }
       r.appendChild(el('span', 'sub2', 'on-chain'));
       r.appendChild(el('span', 'amt', fmtAtoms(atoms, meta.precision ?? 8)));
       box.appendChild(r);

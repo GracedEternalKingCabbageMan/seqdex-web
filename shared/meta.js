@@ -22,7 +22,7 @@ export async function loadMeta() {
     fetch(BASE + '/registry/index.minimal.json', { cache: 'no-store' }).then((r) => r.json()).then((idx) => {
       const m = {};
       const clean = (s, n) => (typeof s === 'string') ? s.replace(/[<>]/g, '').slice(0, n) : s;
-      for (const [id, v] of Object.entries(idx)) if (Array.isArray(v)) m[id] = { ticker: clean(v[1], 16), name: clean(v[2], 48), precision: v[3], domain: v[0], verified: !!v[4] };
+      for (const [id, v] of Object.entries(idx)) if (Array.isArray(v)) m[id] = { ticker: clean(v[1], 16), name: clean(v[2], 48), precision: v[3], domain: v[0], verified: !!v[4], supervised: !!v[5] };
       REGISTRY = m;
     }),
     fetch(BASE + '/prices', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
@@ -40,6 +40,31 @@ export function assetMeta(hex) {
   return REGISTRY[hex] || DEFAULTS[hex] || { ticker: hex.slice(0, 6) + '…', name: 'Asset ' + hex.slice(0, 10) + '…', precision: 8 };
 }
 export function policyHex() { return POLICY_HEX; }
+
+// SEQUENTIA: whether this asset's issuer can freeze holdings of it by consensus
+// rule (Sequentia src/supervision.h). Part of the asset's identity, committed in
+// its id, so it can never be added or removed later.
+//
+// It matters more here than almost anywhere else: a trader is about to ACQUIRE
+// the asset, and a resting order is a standing offer to acquire more. What a
+// freeze reaches is worth stating precisely, because the answer is favourable
+// to the DEX and counter-intuitive: an ordinary address holding the asset can
+// be frozen, but a channel, an HTLC or a covenant cannot, since the frozen
+// party is not the only party to those funds. So settlement in flight is never
+// caught halfway.
+export function assetSupervised(hex) {
+  if (!hex || hex === 'BTC' || hex === POLICY_HEX) return false;
+  const r = REGISTRY[hex];
+  return !!(r && r.supervised);
+}
+
+// One sentence for a tooltip or a badge, wherever a market names an asset.
+export function supervisionNote(hex) {
+  if (!assetSupervised(hex)) return '';
+  return 'Supervised asset: its issuer can freeze holdings at ordinary addresses. '
+       + 'Funds in a channel, an HTLC or a covenant are out of reach, so a swap in flight cannot be caught halfway, '
+       + 'and the issuer can never spend your coins.';
+}
 
 export function fmtAtoms(atoms, d) {
   let a = BigInt(atoms); const neg = a < 0n; if (neg) a = -a;
