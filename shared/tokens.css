@@ -100,6 +100,10 @@ button { font-family: var(--disp); cursor: pointer; }
 .mkt:hover { background: var(--panel2); }
 .mkt.on { background: var(--panel2); box-shadow: inset 2px 0 0 var(--accent); }
 .mkt .pair { font-weight: 700; }
+/* Supervised asset: the issuer can freeze holdings at ordinary addresses.
+   Informative, not a warning. A regulated stablecoin doing what it must is not
+   suspect, and colouring it like a risk would teach traders to ignore it. */
+.sup { color: var(--amber2, #e0a800); font-size: 11px; margin-left: 5px; cursor: help; }
 .mkt .n { margin-left: auto; color: var(--faint); font-family: var(--mono); font-size: 11.5px; }
 
 /* order book */
