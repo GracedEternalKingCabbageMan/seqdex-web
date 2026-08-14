@@ -1,24 +1,24 @@
 import { initChrome, footer, $, el } from '../shared/app.js';
-import { assetMeta, fmtAtoms, policyHex } from '../shared/meta.js';
+import { assetMeta, fmtAtoms, policyHex, assetByTicker } from '../shared/meta.js';
 import * as P from '../shared/provider.js';
 
 await initChrome('channels.html');
 footer();
 
-// Assets offered in the buy form: BTC plus everything the wallet holds
-// (the wallet gates which of those can actually run a Lightning node).
+// The marketplace sells inbound capacity for a FIXED catalog: BTC plus the
+// faucet assets. Deliberately NOT the connected wallet's holdings: the asset
+// a user most wants inbound capacity for is usually one they do not hold yet,
+// and a wallet can hold assets this marketplace does not serve.
+const FAUCET_TICKERS = ['USDX', 'EURX', 'GOLD', 'SILVR', 'OILX'];
 async function fillAssets() {
   const sel = $('inAsset');
   sel.innerHTML = '';
   const add = (v, label) => { const o = el('option', null, label); o.value = v; sel.appendChild(o); };
   add('BTC', 'BTC (testnet4)');
-  if (P.account()) {
-    try {
-      const b = await P.getBalances();
-      for (const hex of Object.keys(b.assets || {})) add(hex, assetMeta(hex).ticker);
-    } catch {}
-  } else {
-    add(policyHex(), 'tSEQ');
+  add(policyHex(), 'tSEQ');
+  for (const t of FAUCET_TICKERS) {
+    const id = assetByTicker(t);
+    if (id) add(id, t);
   }
 }
 

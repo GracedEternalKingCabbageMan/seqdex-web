@@ -40,6 +40,15 @@ export function assetMeta(hex) {
   return REGISTRY[hex] || DEFAULTS[hex] || { ticker: hex.slice(0, 6) + '…', name: 'Asset ' + hex.slice(0, 10) + '…', precision: 8 };
 }
 export function policyHex() { return POLICY_HEX; }
+// Id-by-ticker resolution for fixed catalogs (channel marketplace). Pinned to
+// the sequentia.io issuer domain so a squatter ticker on another domain cannot
+// hijack a catalog slot.
+export function assetByTicker(ticker, domain = 'sequentia.io') {
+  for (const [id, m] of Object.entries(REGISTRY)) {
+    if (m.ticker === ticker && (!domain || m.domain === domain)) return id;
+  }
+  return null;
+}
 
 // SEQUENTIA: whether this asset's issuer can freeze holdings of it by consensus
 // rule (Sequentia src/supervision.h). Part of the asset's identity, committed in
