@@ -70,6 +70,7 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
     $('bookTitle').textContent = pairLabel(m);
     await refreshBook();
     renderWallet();
+    renderMarketTicket();
   }
 
   async function refreshBook() {
@@ -221,6 +222,74 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
     const quote = o.side === 'ask' ? ceilDiv(o.quoteAtoms * take, o.baseAtoms)   // you pay quote
                                    : (o.quoteAtoms * take) / o.baseAtoms;        // you receive quote
     return { take, quote, whole: take >= o.baseAtoms };
+  }
+
+  // Market ticket (LNDEX): side + amount only; the WALLET plans the walk from
+  // the relay book and shows one aggregate approval. Users stop being obliged
+  // to pick a single resting order by hand.
+  function renderMarketTicket() {
+    if (fill !== 'ln' || !current) return;
+    const tp = $('ticketPanel');
+    let box = document.getElementById('marketPanel');
+    if (!box) {
+      box = el('div', 'panel');
+      box.id = 'marketPanel';
+      tp.parentNode.insertBefore(box, tp);
+    }
+    box.innerHTML = '';
+    const bm = assetMeta(current.base);
+    const qm = current.quote === 'BTC' ? { ticker: 'BTC', precision: 8 } : assetMeta(current.quote);
+    box.appendChild(el('h2', null, 'Market order'));
+    const row = el('div'); row.style.display = 'flex'; row.style.gap = '8px'; row.style.margin = '6px 0 10px';
+    const bBuy = el('button', 'btn', 'Buy ' + bm.ticker);
+    const bSell = el('button', 'btn', 'Sell ' + bm.ticker);
+    let side = 'buy';
+    const paint = () => { bBuy.style.opacity = side === 'buy' ? '1' : '.45'; bSell.style.opacity = side === 'sell' ? '1' : '.45'; };
+    bBuy.onclick = () => { side = 'buy'; paint(); };
+    bSell.onclick = () => { side = 'sell'; paint(); };
+    row.appendChild(bBuy); row.appendChild(bSell); box.appendChild(row); paint();
+    const lbl = el('label', 'lbl', 'Amount (' + bm.ticker + ') · walks the book across resting orders, one wallet approval');
+    box.appendChild(lbl);
+    const inp = el('input', 'mono'); box.appendChild(inp);
+    const go = el('button', 'btn', 'Place market order'); go.style.marginTop = '10px';
+    box.appendChild(go);
+    const st = el('div', 'status'); box.appendChild(st);
+    go.onclick = async () => {
+      st.className = 'status'; st.textContent = '';
+      if (!P.account()) {
+        try { await P.connect(); } catch (e) { st.className = 'status err'; st.textContent = e.message; return; }
+      }
+      let atoms;
+      try { atoms = parseBaseAmt(inp.value, bm.precision); } catch (e) { st.className = 'status err'; st.textContent = e.message; return; }
+      go.disabled = true;
+      st.textContent = 'Waiting for wallet approval…';
+      try {
+        let res = await P.request('dexMarketOrder', { room: 'ln', base: current.base, quote: current.quote, side, baseAtoms: atoms.toString() });
+        if (res.jobId) {
+          st.textContent = 'Market order running in your wallet…';
+          const deadline = Date.now() + 20 * 60_000;
+          for (;;) {
+            await new Promise((r) => setTimeout(r, 4000));
+            const jr = await P.request('dexJobResult', { jobId: res.jobId }).catch(() => ({ done: false }));
+            if (jr.done) {
+              if (!jr.ok) throw new Error(jr.error || 'no slice settled');
+              res = jr.result;
+              break;
+            }
+            if (Date.now() > deadline) throw new Error('the order is taking unusually long; check your balances');
+          }
+        }
+        const okSlices = (res.slices || []).filter((x) => x.ok).length;
+        st.className = 'status ok';
+        st.textContent = 'Filled ' + fmtAtoms(big(res.baseAtoms), bm.precision) + ' ' + bm.ticker +
+          (side === 'buy' ? ' for ' : ' receiving ') + fmtAtoms(big(res.quoteAtoms), qm.precision) + ' ' + qm.ticker +
+          ' across ' + okSlices + ' order' + (okSlices === 1 ? '' : 's') + ', all over Lightning.';
+        refreshBook(); loadWallet();
+      } catch (e) {
+        st.className = 'status err';
+        st.textContent = 'Market order failed: ' + e.message;
+      } finally { go.disabled = false; }
+    };
   }
 
   function openTicket(o) {
