@@ -28,6 +28,15 @@ export async function initChrome(active) {
   const t = el('small', null, 'testnet'); mark.appendChild(t);
   bar.appendChild(mark);
 
+  const bo = el('a', 'builton');
+  bo.href = 'https://sequentia.io'; bo.target = '_blank'; bo.rel = 'noopener';
+  bo.title = 'SeqDEX runs on the Sequentia network';
+  bo.appendChild(el('span', null, 'on'));
+  const li = document.createElement('img');
+  li.src = 'shared/sequentia-logo.svg'; li.alt = 'Sequentia'; li.className = 'sqlogo';
+  bo.appendChild(li);
+  bar.appendChild(bo);
+
   const nav = el('nav', 'nav');
   for (const [href, label, s] of PAGES) {
     const a = el('a', null, label);
@@ -56,6 +65,20 @@ export async function initChrome(active) {
     catch (e) { console.warn('[connect]', e.message); }
     finally { btn.disabled = false; }
   };
+
+  // No provider means no trading at all; say so plainly, with the way out.
+  if (!P.hasWallet()) {
+    const note = el('div', 'extnote');
+    note.appendChild(el('b', null, 'SeqDEX needs the Sequentia wallet extension. '));
+    note.appendChild(document.createTextNode('Every order and every settlement is signed inside the extension; this site never holds keys or funds. Get the extension from the '));
+    const dl = el('a', null, 'downloads page');
+    dl.href = 'https://sequentiatestnet.com/download/'; dl.target = '_blank'; dl.rel = 'noopener';
+    note.appendChild(dl);
+    note.appendChild(document.createTextNode(', install it in a Chromium browser (Chrome, Brave, Edge), then reload this page.'));
+    bar.parentNode.insertBefore(note, bar.nextSibling);
+    // The provider can inject a beat after us; drop the note if it shows up.
+    setTimeout(() => { if (P.hasWallet()) note.remove(); }, 1500);
+  }
 
   P.watchEvents();
   await Promise.allSettled([loadMeta(), P.restore()]);
