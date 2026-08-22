@@ -7,14 +7,14 @@ contract (surfaces, books, settlement phases, provider dependencies).
 
 - **No unified order book.** The three surfaces are separate rooms by
   product decision (user directive 2026-08-12): LNDEX (`/seqob-pln`,
-  `lightning.ln_direction == 2` only), on-chain (`/seqob`), confidential
+  `lightning.ln_direction` 2 or 3 only), on-chain (`/seqob`), confidential
   (`/seqob-conf`, `pair.confidential == true` only). Do not merge them.
 - **The wallet drives everything sensitive.** No keys, no signing, no
   invoice handling in this repo; extend
   `sequentia-extension/doc/PROVIDER.md` first when a flow needs a new
   primitive, then consume it here.
-- LNDEX = pure LN only. Submarine offers (ln_direction 0/1) are the web
-  wallet's business, never shown here.
+- LNDEX = pure LN only. Submarine offers (ln_direction 0/1) and sub-asset
+  offers (4/5) are the web wallet's business, never shown here.
 - Confidential DEX never gets a BTC leg (Bitcoin has no CT).
 - Static ES modules, no bundler. Surface accents are informational
   (violet LN, gold chain, teal confidential); keep them consistent.
@@ -31,9 +31,10 @@ Box clone `/srv/seqdex-web` (must live outside /root: Caddy's file_server runs a
 ## Endpoints consumed
 
 Same-origin under sequentiatestnet.com: `/registry/index.minimal.json`,
-`/prices`, `/seqob*` relay mounts. All read-only from the site; writes
-(posting offers, fills) will go through wallet-signed payloads per
-DESIGN.md phases.
+`/prices`, the `/seqob`, `/seqob-pln` and `/seqob-conf` relay mounts
+(`/seqob-chan` is reserved in `shared/book.js` and not deployed). All
+read-only from the site; fills and orders go through the wallet's `dex*`
+provider methods, which talk to the relay themselves.
 
 <!-- BEGIN SHARED AGENT CONVENTIONS: identical in every Sequentia repo. Change it in all of them together. -->
 ## Working with git and GitHub here

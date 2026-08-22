@@ -1,6 +1,6 @@
 // Relay book client. Each surface reads its own mount; there is no unified
 // book by design.
-//   LNDEX        -> /seqob-pln  (only offers with lightning.ln_direction == 2)
+//   LNDEX        -> /seqob-pln  (only offers with lightning.ln_direction 2 or 3)
 //   On-chain DEX -> /seqob      (same-chain, covenant, cross-chain BTC)
 //   Confidential -> /seqob-conf (markets with pair.confidential == true)
 import { BASE } from './meta.js';
@@ -9,7 +9,7 @@ export const MOUNTS = {
   ln: BASE + '/seqob-pln',
   chain: BASE + '/seqob',
   conf: BASE + '/seqob-conf',
-  chan: BASE + '/seqob-chan',
+  chan: BASE + '/seqob-chan', // reserved for the P2P channel-offer book; not deployed, no page reads it
 };
 
 async function getJSON(url) {
@@ -60,8 +60,9 @@ function normalizeOffer(o) {
 }
 
 // The LNDEX surface: both legs Lightning, nothing else. Offer families by
-// ln_direction (seqdex seqob-crosser/norm.go): 0/1 submarine, 2/3 pure LN,
-// 4/5 sub-asset. Only the pure family belongs here.
+// ln_direction (seqdex offer.proto LightningTerms.ln_direction; families per
+// seqob-crosser/norm.go on seqdex's phase3-pure-ln branch): 0/1 submarine,
+// 2/3 pure LN, 4/5 sub-asset. Only the pure family belongs here.
 export function pureLnOnly(offers) {
   return offers.filter((o) => o.lnDirection === 2 || o.lnDirection === 3);
 }

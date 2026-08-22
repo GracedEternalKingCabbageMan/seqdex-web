@@ -2,8 +2,8 @@
 
 The standalone SeqDEX website for the Sequentia testnet, live at
 https://sequentiatestnet.com/dex/. Non-custodial by construction: it has no
-wallet of its own and drives everything through the Sequentia browser
-extension wallet (`window.sequentia`).
+wallet of its own and drives everything through the Ambra browser extension
+(repo `sequentia-extension`, `window.sequentia`).
 
 Three trading surfaces, deliberately separate (no unified order book), plus
 a channel marketplace:
@@ -16,8 +16,17 @@ a channel marketplace:
 - **Channel marketplace** — per-asset channel state and inbound liquidity
   for LNDEX traders.
 
-Architecture, settlement designs, and the milestone plan: [DESIGN.md](DESIGN.md).
-Wallet protocol: `sequentia-extension/doc/PROVIDER.md`.
+The web wallet ([`sequentia-web-wallet`](https://github.com/GracedEternalKingCabbageMan/sequentia-web-wallet))
+carries the unified trading terminal; this site is the split-surface
+alternative that reads the same relays.
+
+Architecture, settlement designs, and the milestone status: [DESIGN.md](DESIGN.md).
+Wallet protocol: [`sequentia-extension/doc/PROVIDER.md`](https://github.com/GracedEternalKingCabbageMan/sequentia-extension/blob/master/doc/PROVIDER.md).
 
 Static ES modules, no bundler, no framework. Serve the directory as-is;
 deployed behind Caddy at `/dex/` on the testnet box.
+
+Run it locally: `python3 -m http.server 8080` in this directory and open
+http://localhost:8080/index.html. Books, the asset registry and prices are
+fetched from sequentiatestnet.com when the page is served from any other
+origin (`shared/meta.js`, `BASE`); wallet features need the extension.
