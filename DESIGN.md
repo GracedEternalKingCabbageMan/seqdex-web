@@ -1,9 +1,10 @@
 # SeqDEX site — architecture
 
 The standalone SeqDEX website. It has no wallet of its own: every key
-operation goes through the Sequentia browser extension wallet via
-`window.sequentia` (protocol: `sequentia-extension/doc/PROVIDER.md`). Unlike
-the web wallet's terminal there is **no unified order book**: the site is
+operation goes through the Ambra browser extension (repo
+`sequentia-extension`) via `window.sequentia` (protocol:
+[`sequentia-extension/doc/PROVIDER.md`](https://github.com/GracedEternalKingCabbageMan/sequentia-extension/blob/master/doc/PROVIDER.md)).
+Unlike the web wallet's terminal there is **no unified order book**: the site is
 deliberately split into three trading surfaces plus a channel marketplace,
 and the UI color-codes each surface so the user always knows which
 settlement world they are in.
@@ -19,13 +20,16 @@ Lightning against BTC over testnet4 Lightning), plus asset-to-asset trades
 with both legs on Sequentia Lightning.
 
 - Book: the `/seqob-pln` relay (:9965). LNDEX shows only offers whose
-  `lightning.ln_direction == 2` (both legs Lightning). The same relay also
-  carries submarine offers (`ln_direction` 0 and 1); those are filtered out
-  here by definition of the surface.
-- Settlement: hold-invoice pairs. The taker's wallet creates and pays
-  invoices on the user's own hosted SeqLN nodes (device co-signed,
-  non-custodial). Instant and final when it settles: nothing on-chain, no
-  Bitcoin-reorg risk.
+  `lightning.ln_direction` is 2 or 3 (the two pure-Lightning directions). The
+  same relay also carries submarine offers (`ln_direction` 0 and 1) and
+  sub-asset offers (4 and 5); those are filtered out here by definition of
+  the surface (`shared/book.js`, `pureLnOnly`).
+- Settlement: hold-invoice pairs. The site sends `dexSwapLn` (fill one
+  order), `dexMarketOrder` or `dexPlaceLimit` (the wallet walks the book and
+  rests the remainder) and polls `dexJobResult`; the wallet creates and pays
+  the invoices on the user's own hosted SeqLN nodes (device co-signed,
+  non-custodial) behind one approval. Instant and final when it settles:
+  nothing on-chain, no Bitcoin-reorg risk.
 - Prerequisite surfaced in the UI: per-asset channel state (spendable and
   receivable) from the wallet. A user without inbound liquidity for the
   asset they are buying is routed to the Channels page.
@@ -38,9 +42,12 @@ and OpenAMP restricted assets.
   (`SameChainTerms`), funded covenant resting orders (`CovenantTerms`,
   oversell-impossible, maker can be offline), and cross-chain offers
   (`CrossChainTerms`, `quote_asset == 'BTC'`).
-- Settlement: taker composes the swap PSET from wallet UTXOs
-  (`getUtxos`) and has the wallet sign it (`signPset`), or fills a covenant
-  UTXO directly; cross-chain runs the HTLC dance with wallet-held keys.
+- Settlement is delegated whole to the wallet: the site sends
+  `dexFillOnchain` (`mount: 'chain'`) with the order id and size, the wallet
+  recomputes the fill from the relay, composes and signs the swap PSET (or
+  the covenant FILL spend) and shows one approval. The site never sees UTXOs
+  or PSETs. Cross-chain (BTC-quoted) rows are listed, but the wallet refuses
+  to fill them yet (`dexFillOnchain` rejects cross-chain offers).
 - OpenAMP: restricted-asset legs settle as enclave transfers (policy-server
   co-signed) coordinated with the on-chain counterleg; the wallet's
   never-blind-sign rule applies unchanged.
@@ -56,8 +63,9 @@ confidential transactions, so a cross leg would unblind the trade).
 - Book: a dedicated relay mount `/seqob-conf` (same `seqobd` binary, new
   instance) so confidential and transparent books never mix.
 - Settlement: same-chain interactive settlement with confidential
-  (`tsqb1…`) addresses and blinded PSETs. The wallet signs blinded PSETs
-  today; decoding them for the approval screen is a wallet-side follow-up.
+  (`tsqb1…`) addresses and blinded PSETs, via `dexFillOnchain` with
+  `mount: 'conf'`. The wallet signs blinded PSETs today; decoding them for
+  the approval screen is a wallet-side follow-up.
 
 ### 4. Channels marketplace (accent: violet, serves the LNDEX)
 Inbound liquidity for LNDEX traders: you cannot RECEIVE an asset over
@@ -67,9 +75,10 @@ Lightning without inbound capacity in that asset.
   reads the user's per-asset channel state from the wallet and lets them
   request inbound capacity (`lnRequestInbound`), which provisions or tops up
   a channel toward the user's own hosted node.
-- Phase two: a P2P channel-offer book (`/seqob-chan` relay mount): sellers
-  post priced offers (asset, capacity, fee, minimum duration); a buyer pays
-  over Lightning or on-chain and the seller's node opens the channel.
+- Phase two (planned; the `/seqob-chan` relay mount is not yet deployed and
+  no page reads it): a P2P channel-offer book: sellers post priced offers
+  (asset, capacity, fee, minimum duration); a buyer pays over Lightning or
+  on-chain and the seller's node opens the channel.
 
 ## What the site is
 
@@ -88,25 +97,33 @@ the site runs read-only with an install prompt.
 Live in `sequentia-extension` (`doc/PROVIDER.md` is the contract; changes
 land there first):
 
-- v0.1 (shipped): connect, getAccounts, getNetwork, getBalances, getAddress,
-  signPset, signMessage, broadcast, createInvoice, payInvoice.
-- v0.2 (this milestone): `getUtxos` (compose swap PSETs site-side),
-  `lnChannels` (per-asset spendable/receivable, the LNDEX gate),
-  `lnRequestInbound` (the marketplace phase-one purchase).
-- v0.3 (planned, per settlement phase): hold-invoice create/settle for P2P
-  LN atomicity, BTC HTLC signing surfaces for on-chain cross swaps, blinded
-  PSET decode for the confidential approval screen.
+- Shipped and used here: `connect`, `getAccounts`, `getNetwork`,
+  `getBalances`, `lnChannels` (per-asset spendable/receivable, the LNDEX
+  gate), `lnRequestInbound` (the marketplace phase-one purchase), and the
+  DEX methods the wallet settles behind one approval: `dexSwapLn`,
+  `dexMarketOrder`, `dexPlaceLimit`, `dexFillOnchain`, `dexJobResult`.
+- Shipped in the provider but not called by this site: `getAddress`,
+  `getUtxos`, `signPset`, `signMessage`, `broadcast`, `createInvoice`,
+  `payInvoice` (`shared/provider.js` exports wrappers; settlement never
+  composes PSETs or invoices site-side).
+- Planned: BTC HTLC fills for on-chain cross swaps, blinded PSET decode for
+  the confidential approval screen.
 
 ## Phases
 
-- **P0 (this milestone)**: site shell + all four pages with live books,
-  wallet connect, per-asset channel state, working inbound-liquidity
-  request. Trade tickets validate prerequisites but do not yet settle.
-- **P1**: LNDEX taker fills against the live pure-LN makers, end to end.
-- **P2**: on-chain same-chain taker + covenant fills.
-- **P3**: cross-chain BTC (LN first, then on-chain HTLC).
-- **P4**: confidential relay mount + blinded settlement.
-- **P5**: OpenAMP legs on the on-chain DEX; P2P channel-offer book.
+Status as of 2026-08-22:
+
+- **P0 (shipped)**: site shell + all four pages with live books, wallet
+  connect, per-asset channel state, working inbound-liquidity request.
+- **P1 (shipped)**: LNDEX taker fills against the live pure-LN makers, end
+  to end, plus market and limit tickets served by the wallet.
+- **P2 (shipped)**: on-chain same-chain taker + covenant fills via
+  `dexFillOnchain`.
+- **P3 (open)**: cross-chain BTC (LN first, then on-chain HTLC). LNDEX
+  already trades BTC over Lightning where a maker offers it; on-chain
+  BTC-quoted fills are not served yet.
+- **P4 (shipped)**: confidential relay mount + blinded settlement.
+- **P5 (open)**: OpenAMP legs on the on-chain DEX; P2P channel-offer book.
 
 ## Design language
 
