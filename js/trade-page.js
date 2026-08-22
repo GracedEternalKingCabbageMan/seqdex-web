@@ -15,13 +15,9 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
   let timer = null;
   let ticketOffer = null;
 
-  // Wallet-side progress during a fill (the extension streams it).
-  if (P.hasWallet()) {
-    try { window.sequentia.on('dexProgress', (d) => {
-      const st = $('ticketStatus');
-      if (st && d && d.text) { st.className = 'status'; st.textContent = d.text; }
-    }); } catch {}
-  }
+  // Cross-chain (BTC-quoted) orders on the on-chain books: the wallet's
+  // dexFillOnchain refuses them, so the site does not open a ticket for one.
+  const crossChainUnfillable = () => fill !== 'ln' && !!current && current.quote === 'BTC';
 
   async function loadMarkets() {
     const list = $('mktList');
@@ -97,7 +93,8 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
         tr.appendChild(ex);
         if (fill) {
           tr.style.cursor = 'pointer';
-          tr.title = o.covenant ? 'Fill this covenant order (maker can be offline; chain-enforced)' : 'Fill this order';
+          tr.title = crossChainUnfillable() ? 'Cross-chain fills arrive next.'
+            : o.covenant ? 'Fill this covenant order (maker can be offline; chain-enforced)' : 'Fill this order';
           tr.onclick = () => openTicket(o);
           tr.onmouseenter = () => { tr.style.background = 'var(--panel2)'; };
           tr.onmouseleave = () => { tr.style.background = ''; };
@@ -330,10 +327,15 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
   }
 
   function openTicket(o) {
-    ticketOffer = o;
     const box = $('ticketPanel');
     box.classList.remove('hide');
     box.innerHTML = '';
+    if (crossChainUnfillable()) {
+      ticketOffer = null;
+      box.appendChild(el('p', 'status', 'Cross-chain fills arrive next. This order is quoted in BTC and cannot be filled from the site yet.'));
+      return;
+    }
+    ticketOffer = o;
     const bm = assetMeta(current.base);
     const qm = current.quote === 'BTC' ? { ticker: 'BTC', precision: 8 } : assetMeta(current.quote);
     const youBuy = o.side === 'ask';   // taking an ask = you buy base; taking a bid = you sell base
