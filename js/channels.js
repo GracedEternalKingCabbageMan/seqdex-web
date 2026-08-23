@@ -46,7 +46,7 @@ async function renderChannels() {
       const tr = el('tr');
       const tk = el('td', null, meta.ticker); tk.style.fontFamily = 'var(--disp)'; tk.style.fontWeight = '700';
       tr.appendChild(tk);
-      tr.appendChild(el('td', null, c.scid || '—'));
+      tr.appendChild(el('td', null, c.scid || '·'));
       tr.appendChild(el('td', 'bid', fmtAtoms(c.spendable, meta.precision ?? 8)));
       tr.appendChild(el('td', 'ask', c.receivable != null ? fmtAtoms(c.receivable, meta.precision ?? 8) : 'n/a'));
       body.appendChild(tr);
