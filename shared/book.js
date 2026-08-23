@@ -49,6 +49,7 @@ function normalizeOffer(o) {
       baseAtoms: baseAmt,
       quoteAtoms: quoteAmt,
       partial: !!o.allow_partial,
+      minFill: BigInt(o.min_fill || 0),
       expiresAt: Number(o.expires_at_unix || 0),
       maker: o.maker_pubkey,
       lnDirection: o.lightning ? Number(o.lightning.ln_direction ?? -1) : null,

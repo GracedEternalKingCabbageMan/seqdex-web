@@ -8,12 +8,12 @@ wallet of its own and drives everything through the Ambra browser extension
 Three trading surfaces, deliberately separate (no unified order book), plus
 a channel marketplace:
 
-- **LNDEX** — pure Lightning swaps; both legs of every trade run through
+- **LNDEX**: pure Lightning swaps; both legs of every trade run through
   Lightning channels (maker's and taker's), including cross-chain BTC.
-- **On-chain DEX** — atomic on-chain settlement, covenant resting orders,
+- **On-chain DEX**: atomic on-chain settlement, covenant resting orders,
   cross-chain BTC over on-chain contracts, OpenAMP restricted assets.
-- **Confidential DEX** — blinded transactions, Sequentia assets only.
-- **Channel marketplace** — per-asset channel state and inbound liquidity
+- **Confidential DEX**: blinded transactions, Sequentia assets only.
+- **Channel marketplace**: per-asset channel state and inbound liquidity
   for LNDEX traders.
 
 The web wallet ([`sequentia-web-wallet`](https://github.com/GracedEternalKingCabbageMan/sequentia-web-wallet))
