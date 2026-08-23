@@ -1,21 +1,37 @@
-import { initChrome, footer, $ } from '../shared/app.js';
-import { markets, pureLnOnly, orderbook } from '../shared/book.js';
+import { initChrome, footer, $, el } from '../shared/app.js';
+import { markets, pureLnMarkets } from '../shared/book.js';
 import * as P from '../shared/provider.js';
 
 const acc = await initChrome('index.html');
 footer();
 
+// A tile's live line is built from nodes, never from markup: the numbers come
+// from the relay and the wallet, and nothing fetched is ever concatenated
+// into HTML. Pass strings for plain text and [n] for a highlighted number.
+function live(id, ...parts) {
+  const box = $(id);
+  box.textContent = '';
+  parts.forEach((part, i) => {
+    if (i) box.appendChild(document.createTextNode(' · '));
+    if (Array.isArray(part)) {
+      box.appendChild(el('b', null, String(part[0])));
+      box.appendChild(document.createTextNode(' ' + part[1]));
+    } else {
+      box.appendChild(document.createTextNode(part));
+    }
+  });
+}
+
 // Live tile stats from the real books; each fails soft to a plain label.
 (async () => {
   try {
-    const mkts = await markets('ln');
-    let offers = 0;
-    // Count only pure-LN offers (the LNDEX definition), sampling each market's book.
-    await Promise.all(mkts.slice(0, 12).map(async (m) => {
-      try { offers += pureLnOnly(await orderbook('ln', m.base, m.quote)).length; } catch {}
-    }));
-    $('liveLn').innerHTML = `<b>${offers}</b> live pure-Lightning offers · <b>${mkts.length}</b> markets`;
-  } catch { $('liveLn').textContent = 'book unreachable right now'; }
+    // Every market's book is read, not a sample: the LNDEX definition is
+    // per-offer (pure-LN only), and the relay's own counts mix in submarine
+    // and sub-asset offers. Same scan the LNDEX page uses for its list.
+    const mkts = await pureLnMarkets('ln');
+    const offers = mkts.reduce((s, m) => s + m.nOrders, 0);
+    live('liveLn', [offers, 'live pure-Lightning offers'], [mkts.length, 'markets']);
+  } catch { live('liveLn', 'book unreachable right now'); }
 })();
 
 (async () => {
@@ -23,23 +39,24 @@ footer();
     const mkts = await markets('chain');
     const cross = mkts.filter((m) => m.quote === 'BTC').length;
     const n = mkts.reduce((s, m) => s + m.nOrders, 0);
-    $('liveChain').innerHTML = `<b>${n}</b> resting orders · <b>${mkts.length}</b> markets · <b>${cross}</b> cross-chain`;
-  } catch { $('liveChain').textContent = 'book unreachable right now'; }
+    live('liveChain', [n, 'resting orders'], [mkts.length, 'markets'], [cross, 'cross-chain']);
+  } catch { live('liveChain', 'book unreachable right now'); }
 })();
 
 (async () => {
   try {
-    const mkts = await markets('conf');
-    $('liveConf').innerHTML = `<b>${mkts.length}</b> confidential markets`;
-  } catch { $('liveConf').textContent = 'opens with the confidential book'; }
+    // Bitcoin has no confidential transactions; a BTC leg cannot exist in this
+    // room, so a relay entry claiming one is dropped on the floor.
+    const mkts = (await markets('conf')).filter((m) => m.confidential && m.base !== 'BTC' && m.quote !== 'BTC');
+    live('liveConf', [mkts.length, 'confidential markets']);
+  } catch { live('liveConf', 'opens with the confidential book'); }
 })();
 
 (async () => {
-  if (!acc) { $('liveChan').textContent = 'connect the wallet to see your channels'; return; }
+  if (!acc) { live('liveChan', 'connect the wallet to see your channels'); return; }
   try {
     const { deployed, channels } = await P.lnChannels();
-    $('liveChan').innerHTML = deployed
-      ? `<b>${channels.length}</b> of your channels active`
-      : 'Lightning not deployed';
-  } catch (e) { $('liveChan').textContent = 'connect the wallet to see your channels'; }
+    if (deployed) live('liveChan', [channels.length, 'of your channels active']);
+    else live('liveChan', 'Lightning not deployed');
+  } catch (e) { live('liveChan', 'connect the wallet to see your channels'); }
 })();
