@@ -23,8 +23,10 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
     const list = $('mktList');
     try {
       mkts = await markets(mount);
-      // The conf mount IS the blinded namespace (its market summaries do not
-      // carry the flag); offers are still filtered per-offer below.
+      // The relay summarises the transparent and blinded books of a pair as two
+      // markets, flagged on the pair; the confidential surface shows only the
+      // blinded ones (offers are filtered per-offer again below).
+      if (confOnly) mkts = mkts.filter((m) => m.confidential);
       list.innerHTML = '';
       if (!mkts.length) {
         list.appendChild(el('p', 'sub', confOnly
@@ -72,10 +74,18 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
   async function refreshBook() {
     if (!current) return;
     const body = $('bookBody');
+    // The market can change while the fetch is in flight (a click during the
+    // 15 s poll); a reply for the old market must not paint under the new title.
+    const m = current;
     try {
-      let offers = await orderbook(mount, current.base, current.quote);
+      let offers = await orderbook(mount, m.base, m.quote);
+      if (current !== m) return;
       if (lnOnly) offers = pureLnOnly(offers);
       if (confOnly) offers = offers.filter((o) => o.confidential);
+      // The relay sweeps expiry on an interval; between sweeps an expired offer
+      // is still served, and a ticket on it can only fail.
+      const nowSec = Math.floor(Date.now() / 1000);
+      offers = offers.filter((o) => !o.expiresAt || o.expiresAt > nowSec);
       const bPrec = assetMeta(current.base).precision ?? 8;
       const qPrec = current.quote === 'BTC' ? 8 : (assetMeta(current.quote).precision ?? 8);
       const asks = offers.filter((o) => o.side === 'ask').sort((a, b) => priceOf(a, bPrec, qPrec) - priceOf(b, bPrec, qPrec));
@@ -88,7 +98,7 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
         tr.appendChild(el('td', cls, p.toLocaleString(undefined, { maximumFractionDigits: 8 })));
         tr.appendChild(el('td', null, fmtAtoms(o.baseAtoms, bPrec)));
         tr.appendChild(el('td', null, fmtAtoms(o.quoteAtoms, qPrec)));
-        const ex = el('td', null, o.expiresAt ? rel(o.expiresAt) : '—');
+        const ex = el('td', null, o.expiresAt ? rel(o.expiresAt) : '·');
         ex.style.color = 'var(--faint)';
         tr.appendChild(ex);
         if (fill) {
@@ -112,16 +122,48 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
         t.colSpan = 4; tr.appendChild(t); body.innerHTML = ''; body.appendChild(tr);
       }
     } catch (e) {
+      if (current !== m) return;
       body.innerHTML = '';
       const tr = el('tr'); const t = el('td', 'sub', 'Order book unavailable: ' + e.message);
       t.colSpan = 4; tr.appendChild(t); body.appendChild(tr);
     }
   }
 
+  // Polls a wallet job until it is done. A poll that fails (the extension
+  // reloaded, the wallet locked, the port restarted) used to read as "not done
+  // yet" for the whole deadline; after a few failures in a row the last error is
+  // surfaced instead. onTick sees every successful reply.
+  async function waitForJob(jobId, deadlineMs, onTick) {
+    const deadline = Date.now() + deadlineMs;
+    let failures = 0, lastErr = null;
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 4000));
+      let jr;
+      try { jr = await P.request('dexJobResult', { jobId }); failures = 0; }
+      catch (e) { lastErr = e; if (++failures >= 3) throw new Error('lost contact with the wallet: ' + e.message); continue; }
+      if (onTick) onTick(jr);
+      if (jr.done) return jr;
+      if (Date.now() > deadline) throw new Error('the order is taking unusually long; check your balances' + (lastErr ? ' (' + lastErr.message + ')' : ''));
+    }
+  }
+
+  // Parses a decimal typed by the user into atoms at the given precision.
+  // Digits and one point only: Number() would accept hex, exponents and signs,
+  // and a float product rounds by up to an atom in whichever direction the
+  // binary fraction falls, which on a limit price means placing above the typed
+  // limit. Prices and amounts both go through here.
+  function parseDecimalAtoms(str, prec, what) {
+    str = (str || '').trim();
+    if (!/^\d+(\.\d+)?$/.test(str)) throw new Error('enter a valid ' + what);
+    const [i, f = ''] = str.split('.');
+    if (f.length > prec) throw new Error(what + ': max ' + prec + ' decimals');
+    return BigInt(i) * 10n ** BigInt(prec) + BigInt((f + '0'.repeat(prec)).slice(0, prec) || '0');
+  }
+
   function spreadLabel(asks, bids, bPrec, qPrec, qTicker) {
     const a = asks[0] ? priceOf(asks[0], bPrec, qPrec) : null;
     const b = bids[0] ? priceOf(bids[0], bPrec, qPrec) : null;
-    if (a == null && b == null) return '—';
+    if (a == null && b == null) return '·';
     if (a != null && b != null) return 'spread ' + (a - b).toLocaleString(undefined, { maximumFractionDigits: 8 }) + ' ' + qTicker;
     return a != null ? 'asks only' : 'bids only';
   }
@@ -162,7 +204,7 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
       const atoms = s.hex === 'BTC' ? (balances.btc || '0') : (balances.assets[s.hex] || '0');
       const r = el('div', 'wrow');
       const tk = el('span', 'tk', meta.ticker);
-      tk.title = assetSupervised(s.hex) ? (meta.name + ' — ' + supervisionNote(s.hex)) : meta.name;
+      tk.title = assetSupervised(s.hex) ? (meta.name + '. ' + supervisionNote(s.hex)) : meta.name;
       r.appendChild(tk);
       if (assetSupervised(s.hex)) {
         const sup = el('span', 'sup', '⊘'); sup.title = supervisionNote(s.hex); r.appendChild(sup);
@@ -177,7 +219,7 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
         const r2 = el('div', 'wrow');
         r2.appendChild(el('span', 'tk', '⚡'));
         r2.appendChild(el('span', 'sub2', ch.length ? (ch.length + ' channel' + (ch.length > 1 ? 's' : '')) : 'no channel'));
-        r2.appendChild(el('span', 'amt', ch.length ? (fmtAtoms(spend, meta.precision ?? 8) + (recv != null ? ' / ' + fmtAtoms(recv, meta.precision ?? 8) : '')) : '—'));
+        r2.appendChild(el('span', 'amt', ch.length ? (fmtAtoms(spend, meta.precision ?? 8) + (recv != null ? ' / ' + fmtAtoms(recv, meta.precision ?? 8) : '')) : '·'));
         box.appendChild(r2);
       }
     }
@@ -202,22 +244,20 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
   const big = (v) => BigInt(v ?? 0);
   const ceilDiv = (a, b) => (a + b - 1n) / b;
 
-  function parseBaseAmt(str, prec) {
-    str = (str || '').trim();
-    if (!/^\d+(\.\d+)?$/.test(str)) throw new Error('enter a valid amount');
-    const [i, f = ''] = str.split('.');
-    if (f.length > prec) throw new Error('max ' + prec + ' decimals');
-    return BigInt(i) * 10n ** BigInt(prec) + BigInt((f + '0'.repeat(prec)).slice(0, prec) || '0');
-  }
+  function parseBaseAmt(str, prec) { return parseDecimalAtoms(str, prec, 'amount'); }
 
   // Preview mirror of the wallet's math (the wallet recomputes from the relay
-  // and its numbers are the ones on the approval sheet).
+  // and its numbers are the ones on the approval sheet). A partial take is
+  // clamped to the offer's min_fill, which the relay enforces on the lift.
   function previewFill(o, takeBase) {
     let take = takeBase;
     if (take < 1n) take = 1n;
+    if (o.minFill > 0n && take < o.minFill) take = o.minFill;
     if (take > o.baseAtoms) take = o.baseAtoms;
-    const quote = o.side === 'ask' ? ceilDiv(o.quoteAtoms * take, o.baseAtoms)   // you pay quote
-                                   : (o.quoteAtoms * take) / o.baseAtoms;        // you receive quote
+    // Same direction as the wallet's slice pricing (plnSliceQuote): floor when
+    // you GIVE the quote (taking an ask), ceil when you RECEIVE it (taking a bid).
+    const quote = o.side === 'ask' ? (o.quoteAtoms * take) / o.baseAtoms          // you pay quote
+                                   : ceilDiv(o.quoteAtoms * take, o.baseAtoms);   // you receive quote
     return { take, quote, whole: take >= o.baseAtoms };
   }
 
@@ -281,47 +321,50 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
       st.textContent = 'Waiting for wallet approval…';
       try {
         let res;
+        let warning = '';
         if (mode === 'limit') {
-          const px = Number(pinp.value);
-          if (!(px > 0)) throw new Error('enter a limit price');
+          // The wallet binds to limitQuoteAtoms as the exact integer price for the
+          // whole amount, so it is computed in integers: price scaled to the quote
+          // precision, times the base atoms, over one base unit. A buy never pays
+          // above the typed limit (floor); a sell never receives below it (ceil).
           const qprec = qm.precision ?? 8;
-          const baseUnits = Number(atoms) / Math.pow(10, bm.precision ?? 8);
-          const limitQuoteAtoms = Math.round(baseUnits * px * Math.pow(10, qprec));
-          if (!(limitQuoteAtoms > 0)) throw new Error('price times amount rounds to zero');
-          res = await P.request('dexPlaceLimit', { room: 'ln', base: current.base, quote: current.quote, side, baseAtoms: atoms.toString(), limitQuoteAtoms: String(limitQuoteAtoms) });
+          const bprec = bm.precision ?? 8;
+          const priceAtoms = parseDecimalAtoms(pinp.value, qprec, 'limit price');
+          if (priceAtoms <= 0n) throw new Error('enter a limit price');
+          const unit = 10n ** BigInt(bprec);
+          const product = atoms * priceAtoms;
+          const limitQuoteAtoms = side === 'buy' ? product / unit : ceilDiv(product, unit);
+          if (limitQuoteAtoms <= 0n) throw new Error('price times amount rounds to zero');
+          res = await P.request('dexPlaceLimit', { room: 'ln', base: current.base, quote: current.quote, side, baseAtoms: atoms.toString(), limitQuoteAtoms: limitQuoteAtoms.toString() });
         } else {
           res = await P.request('dexMarketOrder', { room: 'ln', base: current.base, quote: current.quote, side, baseAtoms: atoms.toString() });
         }
         if (res.jobId) {
           st.textContent = mode === 'limit' ? 'Order placed; your wallet is serving it…' : 'Market order running in your wallet…';
-          const deadline = Date.now() + (mode === 'limit' ? 12 * 60 * 60_000 : 20 * 60_000);
-          for (;;) {
-            await new Promise((r) => setTimeout(r, 4000));
-            const jr = await P.request('dexJobResult', { jobId: res.jobId }).catch(() => ({ done: false }));
-            if (jr.resting) {
+          const jr = await waitForJob(res.jobId, mode === 'limit' ? 12 * 60 * 60_000 : 20 * 60_000, (tick) => {
+            if (tick.resting) {
               st.className = 'status ok';
-              st.textContent = 'Resting on the book (' + fmtAtoms(big(jr.remaining || '0'), bm.precision) + ' ' + bm.ticker +
-                ' remaining' + (Number(jr.filledAtoms || 0) > 0 ? ', ' + fmtAtoms(big(jr.filledAtoms), bm.precision) + ' filled so far' : '') +
+              st.textContent = 'Resting on the book (' + fmtAtoms(big(tick.remaining || '0'), bm.precision) + ' ' + bm.ticker +
+                ' remaining' + (Number(tick.filledAtoms || 0) > 0 ? ', ' + fmtAtoms(big(tick.filledAtoms), bm.precision) + ' filled so far' : '') +
                 '). Served live by your wallet; keep this browser open.';
               refreshBook();
             }
-            if (jr.done) {
-              if (!jr.ok) throw new Error(jr.error || 'no slice settled');
-              res = jr.result;
-              break;
-            }
-            if (Date.now() > deadline) throw new Error('the order is taking unusually long; check your balances');
-          }
+          });
+          if (!jr.ok) throw new Error(jr.error || 'no slice settled');
+          // A limit order can fill its crossing slices and then fail to rest the
+          // remainder; the wallet reports ok with an error attached. Say so.
+          if (jr.error) warning = ' Note: ' + jr.error;
+          res = jr.result;
         }
-        const okSlices = (res.slices || []).filter((x) => x.ok).length;
+        const okSlices = (res.slices || []).filter((x) => x.ok).length + (res.fills || []).length;
         st.className = 'status ok';
         st.textContent = 'Filled ' + fmtAtoms(big(res.baseAtoms), bm.precision) + ' ' + bm.ticker +
           (side === 'buy' ? ' for ' : ' receiving ') + fmtAtoms(big(res.quoteAtoms), qm.precision) + ' ' + qm.ticker +
-          ' across ' + okSlices + ' order' + (okSlices === 1 ? '' : 's') + ', all over Lightning.';
+          ' across ' + okSlices + ' order' + (okSlices === 1 ? '' : 's') + ', all over Lightning.' + warning;
         refreshBook(); loadWallet();
       } catch (e) {
         st.className = 'status err';
-        st.textContent = 'Market order failed: ' + e.message;
+        st.textContent = (mode === 'limit' ? 'Limit order failed: ' : 'Market order failed: ') + e.message;
       } finally { go.disabled = false; }
     };
   }
@@ -340,7 +383,8 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
     const qm = current.quote === 'BTC' ? { ticker: 'BTC', precision: 8 } : assetMeta(current.quote);
     const youBuy = o.side === 'ask';   // taking an ask = you buy base; taking a bid = you sell base
     box.appendChild(el('h2', null, (youBuy ? 'Buy ' : 'Sell ') + bm.ticker + (youBuy ? ' with ' : ' for ') + qm.ticker));
-    const lbl = el('label', 'lbl', 'Amount (' + bm.ticker + ') · offer size ' + fmtAtoms(o.baseAtoms, bm.precision));
+    const lbl = el('label', 'lbl', 'Amount (' + bm.ticker + ') · offer size ' + fmtAtoms(o.baseAtoms, bm.precision) +
+      (o.partial && o.minFill > 0n ? ' · minimum ' + fmtAtoms(o.minFill, bm.precision) : ''));
     lbl.htmlFor = 'ticketAmt';
     box.appendChild(lbl);
     const inp = el('input', 'mono'); inp.id = 'ticketAmt';
@@ -391,17 +435,9 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
             // The swap runs as a wallet job that survives anything; poll it.
             st.className = 'status';
             st.textContent = 'Swap running in your wallet…';
-            const deadline = Date.now() + 12 * 60_000;
-            for (;;) {
-              await new Promise((r) => setTimeout(r, 4000));
-              const jr = await P.request('dexJobResult', { jobId: res.jobId }).catch(() => ({ done: false }));
-              if (jr.done) {
-                if (!jr.ok) throw new Error(jr.error || 'swap failed');
-                res = jr.result;
-                break;
-              }
-              if (Date.now() > deadline) throw new Error('the swap is taking unusually long; check your balances before retrying');
-            }
+            const jr = await waitForJob(res.jobId, 12 * 60_000);
+            if (!jr.ok) throw new Error(jr.error || 'swap failed');
+            res = jr.result;
           }
           st.className = 'status ok';
           st.textContent = 'Settled over Lightning: ' +
@@ -416,7 +452,7 @@ export async function runTradePage({ mount, lnOnly = false, confOnly = false, wa
           });
           st.className = 'status ok';
           st.textContent = 'Filled. Swap transaction ' + (res.txid ? res.txid.slice(0, 16) + '…' : 'broadcast') +
-            ' — settles in about a block.';
+            '. Settles in about a block.';
         }
         refreshBook();
         loadWallet();
