@@ -12,7 +12,10 @@ footer();
 const FAUCET_TICKERS = ['USDX', 'EURX', 'GOLD', 'SILVR', 'OILX'];
 async function fillAssets() {
   const sel = $('inAsset');
-  sel.innerHTML = '';
+  // Rebuilt on every account change (the registry may have landed since); the
+  // user's in-progress choice survives the rebuild when it is still offered.
+  const was = sel.value;
+  sel.textContent = '';
   const add = (v, label) => { const o = el('option', null, label); o.value = v; sel.appendChild(o); };
   add('BTC', 'BTC (testnet4)');
   add(policyHex(), 'tSEQ');
@@ -20,12 +23,13 @@ async function fillAssets() {
     const id = assetByTicker(t);
     if (id) add(id, t);
   }
+  if (was && Array.from(sel.options).some((o) => o.value === was)) sel.value = was;
 }
 
 async function renderChannels() {
   const body = $('chanBody');
   const intro = $('chanIntro');
-  body.innerHTML = '';
+  body.textContent = '';
   if (!P.account()) {
     intro.textContent = P.hasWallet()
       ? 'Connect the wallet to see your Lightning channels.'

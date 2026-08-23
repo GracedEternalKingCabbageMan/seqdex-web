@@ -1,4 +1,4 @@
-# SeqDEX site — architecture
+# SeqDEX site: architecture
 
 The standalone SeqDEX website. It has no wallet of its own: every key
 operation goes through the Ambra browser extension (repo
@@ -23,13 +23,22 @@ with both legs on Sequentia Lightning.
   `lightning.ln_direction` is 2 or 3 (the two pure-Lightning directions). The
   same relay also carries submarine offers (`ln_direction` 0 and 1) and
   sub-asset offers (4 and 5); those are filtered out here by definition of
-  the surface (`shared/book.js`, `pureLnOnly`).
+  the surface (`shared/book.js`, `pureLnOnly`). The relay's per-market
+  counts (`/v1/markets`, `n_orders`) add all three families together, so the
+  LNDEX market list is not taken from them: each market's book is read once
+  (`pureLnMarkets`), markets with no live pure-Lightning offer are dropped,
+  and the count shown is the pure-Lightning one. The index tile uses the
+  same scan.
 - Settlement: hold-invoice pairs. The site sends `dexSwapLn` (fill one
   order), `dexMarketOrder` or `dexPlaceLimit` (the wallet walks the book and
   rests the remainder) and polls `dexJobResult`; the wallet creates and pays
   the invoices on the user's own hosted SeqLN nodes (device co-signed,
   non-custodial) behind one approval. Instant and final when it settles:
-  nothing on-chain, no Bitcoin-reorg risk.
+  nothing on-chain, no Bitcoin-reorg risk. The extension also broadcasts a
+  `dexProgress` event (`{ text, job }`) to every connected page for every
+  job it runs; the site paints a tick only for a job it started itself,
+  into that ticket's status line, and stops the moment the job's result is
+  in, so another tab's progress never overwrites an outcome here.
 - Prerequisite surfaced in the UI: per-asset channel state (spendable and
   receivable) from the wallet. A user without inbound liquidity for the
   asset they are buying is routed to the Channels page.
@@ -102,10 +111,15 @@ land there first):
   gate), `lnRequestInbound` (the marketplace phase-one purchase), and the
   DEX methods the wallet settles behind one approval: `dexSwapLn`,
   `dexMarketOrder`, `dexPlaceLimit`, `dexFillOnchain`, `dexJobResult`.
-- Shipped in the provider but not called by this site: `getAddress`,
+- Also called, silently: `getCapabilities`, before any other method, so the
+  site refuses a `window.sequentia` that does not identify itself as
+  `sequentia-wallet-extension` (any page script can define that global).
+- Shipped in the provider but deliberately not wrapped here: `getAddress`,
   `getUtxos`, `signPset`, `signMessage`, `broadcast`, `createInvoice`,
-  `payInvoice` (`shared/provider.js` exports wrappers; settlement never
-  composes PSETs or invoices site-side).
+  `payInvoice`. The site never sees a UTXO, composes a PSET or handles an
+  invoice; the wallet does all of that behind the `dex*` methods, and
+  `shared/provider.js` exposes only the methods the site actually calls so
+  nothing sensitive can be reached from here by accident.
 - Planned: BTC HTLC fills for on-chain cross swaps, blinded PSET decode for
   the confidential approval screen.
 

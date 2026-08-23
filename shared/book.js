@@ -68,6 +68,45 @@ export function pureLnOnly(offers) {
   return offers.filter((o) => o.lnDirection === 2 || o.lnDirection === 3);
 }
 
+// The relay sweeps expiry on an interval; between sweeps an expired offer is
+// still served, and a ticket on it can only fail.
+export function unexpired(offers, nowSec = Math.floor(Date.now() / 1000)) {
+  return offers.filter((o) => !o.expiresAt || o.expiresAt > nowSec);
+}
+
+// map with at most `limit` calls in flight; order of results is preserved.
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    for (;;) {
+      const i = next++;
+      if (i >= items.length) return;
+      out[i] = await fn(items[i], i);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
+// The LNDEX market list. /v1/markets on the pure-LN relay counts every offer
+// family in n_orders (submarine, pure, sub-asset together), so a market can
+// show a count and have nothing this surface will list. Each market's book
+// is read once and the list is rebuilt from what is actually pure-LN and
+// live: markets with none are dropped, and nOrders becomes the pure-LN count.
+// A market whose book cannot be read is dropped too rather than shown with a
+// number nobody verified.
+export async function pureLnMarkets(mount = 'ln', mkts = null, concurrency = 6) {
+  const list = mkts || await markets(mount);
+  const scanned = await mapLimit(list, concurrency, async (m) => {
+    try {
+      const offers = unexpired(pureLnOnly(await orderbook(mount, m.base, m.quote)));
+      return { ...m, nOrders: offers.length };
+    } catch { return null; }
+  });
+  return scanned.filter((m) => m && m.nOrders > 0);
+}
+
 // price as a display number: quote units per base unit.
 export function priceOf(o, basePrec, quotePrec) {
   const b = Number(o.baseAtoms) / Math.pow(10, basePrec);
