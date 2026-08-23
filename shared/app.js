@@ -61,14 +61,15 @@ export async function initChrome(active) {
     }
     if (P.account()) return;
     btn.disabled = true;
-    try { await P.connect(); }
-    catch (e) { console.warn('[connect]', e.message); }
+    try { await P.connect(); clearWarning(); }
+    catch (e) { showWarning(bar, 'Could not connect: ' + e.message); }
     finally { btn.disabled = false; }
   };
 
   // No provider means no trading at all; say so plainly, with the way out.
+  let note = null;
   if (!P.hasWallet()) {
-    const note = el('div', 'extnote');
+    note = el('div', 'extnote');
     note.appendChild(el('b', null, 'SeqDEX needs the Sequentia wallet extension. '));
     note.appendChild(document.createTextNode('Every order and every settlement is signed inside the extension; this site never holds keys or funds. Get the extension from the '));
     const dl = el('a', null, 'downloads page');
@@ -76,17 +77,46 @@ export async function initChrome(active) {
     note.appendChild(dl);
     note.appendChild(document.createTextNode(', install it in a Chromium browser (Chrome, Brave, Edge), then reload this page.'));
     bar.parentNode.insertBefore(note, bar.nextSibling);
-    // The provider can inject a beat after us; drop the note if it shows up.
-    setTimeout(() => { if (P.hasWallet()) note.remove(); }, 1500);
   }
 
-  P.watchEvents();
-  await Promise.allSettled([loadMeta(), P.restore()]);
+  // Everything that needs the provider object runs through onProvider, which
+  // fires now if the extension is already injected and otherwise on its
+  // sequentia#initialized event. A provider that lands after init is wired
+  // the same way as one that was there from the start: the install note
+  // goes, the button flips to "Connect wallet", events are watched, and a
+  // silent restore picks up an existing session.
+  let restored = Promise.resolve(null);
+  P.onProvider(() => {
+    if (note) { note.remove(); note = null; }
+    renderConnect(btn, P.account(), true);
+    P.watchEvents();
+    restored = P.restore();
+  });
+
+  // When the provider is already there, onProvider has fired synchronously and
+  // the restore is awaited so a page can render its connected state on first
+  // paint; a late provider's restore reaches the pages through onAccountChange.
+  await Promise.allSettled([loadMeta(), restored]);
   return P.account();
 }
 
+// One notice under the topbar for a failed connect: a user's rejection, a
+// locked wallet, or a provider that did not identify itself as the Sequentia
+// extension. Replaced on the next attempt, removed on success.
+function showWarning(bar, text) {
+  clearWarning();
+  const w = el('div', 'extnote warn', text);
+  w.id = 'connectWarning';
+  w.setAttribute('role', 'alert');
+  bar.parentNode.insertBefore(w, bar.nextSibling);
+}
+function clearWarning() {
+  const w = document.getElementById('connectWarning');
+  if (w) w.remove();
+}
+
 function renderConnect(btn, acc, walletPresent) {
-  btn.innerHTML = '';
+  btn.textContent = '';
   const st = el('span', 'st'); btn.appendChild(st);
   btn.classList.toggle('ok', !!acc);
   if (!walletPresent) {
