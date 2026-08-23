@@ -31,10 +31,12 @@
     <div>
       <div class="panel">
         <h2 id="bookTitle">Order book</h2>
-        <table class="book">
-          <thead><tr><th>Price</th><th>Size (base)</th><th>Total (quote)</th><th>Expires</th></tr></thead>
-          <tbody id="bookBody"></tbody>
-        </table>
+        <div class="scroll">
+          <table class="book">
+            <thead><tr><th>Price</th><th>Size (base)</th><th>Total (quote)</th><th>Expires</th></tr></thead>
+            <tbody id="bookBody"></tbody>
+          </table>
+        </div>
       </div>
       <div class="panel hide" id="ticketPanel" style="margin-top:16px"></div>
     </div>
