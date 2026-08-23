@@ -21,14 +21,16 @@
     per-asset channel state and sells you the capacity you are missing.
   </div>
 
-  <div class="trade-grid" style="grid-template-columns: 1fr 340px">
+  <div class="chan-grid">
     <div class="panel">
       <h2>Your channels</h2>
       <p class="sub" id="chanIntro">Connect the wallet to see your Lightning channels.</p>
-      <table class="book" id="chanTable" style="margin-top:10px">
-        <thead><tr><th>Asset</th><th>Channel</th><th>Spendable</th><th>Receivable</th></tr></thead>
-        <tbody id="chanBody"></tbody>
-      </table>
+      <div class="scroll" style="margin-top:10px">
+        <table class="book" id="chanTable">
+          <thead><tr><th>Asset</th><th>Channel</th><th>Spendable</th><th>Receivable</th></tr></thead>
+          <tbody id="chanBody"></tbody>
+        </table>
+      </div>
     </div>
     <div class="panel">
       <h2>Buy inbound capacity</h2>
@@ -38,9 +40,9 @@
       <label class="lbl" for="inAsset">Asset</label>
       <select id="inAsset"></select>
       <label class="lbl" for="inAmt">Capacity to receive (in asset units)</label>
-      <input id="inAmt" inputmode="decimal" placeholder="0.0">
+      <input id="inAmt" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="0.0">
       <button id="btnInbound" class="btn" style="margin-top:14px">Request inbound capacity</button>
-      <div id="inStatus" class="status"></div>
+      <div id="inStatus" class="status" role="status" aria-live="polite"></div>
       <p class="sub faint" style="margin-top:16px">Peer-to-peer channel offers (sellers
       posting priced capacity) arrive in a later milestone; this page will carry that book.</p>
     </div>
