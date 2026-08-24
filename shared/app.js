@@ -141,6 +141,6 @@ export function footer() {
   f.appendChild(el('span', null, 'SeqDEX · non-custodial · Sequentia testnet'));
   f.appendChild(mk('https://sequentiatestnet.com/', 'Explorer'));
   f.appendChild(mk('https://sequentiatestnet.com/download/', 'Wallet downloads'));
-  f.appendChild(mk('https://github.com/GracedEternalKingCabbageMan/seqdex-web', 'Source'));
+  f.appendChild(mk('https://github.com/ConcatenaLabs/seqdex-web', 'Source'));
   document.querySelector('.wrap').appendChild(f);
 }
