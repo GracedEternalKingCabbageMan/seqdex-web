@@ -3,7 +3,7 @@
 The standalone SeqDEX website. It has no wallet of its own: every key
 operation goes through the Ambra browser extension (repo
 `sequentia-extension`) via `window.sequentia` (protocol:
-[`sequentia-extension/doc/PROVIDER.md`](https://github.com/GracedEternalKingCabbageMan/sequentia-extension/blob/master/doc/PROVIDER.md)).
+[`sequentia-extension/doc/PROVIDER.md`](https://github.com/ConcatenaLabs/sequentia-extension/blob/master/doc/PROVIDER.md)).
 Unlike the web wallet's terminal there is **no unified order book**: the site is
 deliberately split into three trading surfaces plus a channel marketplace,
 and the UI color-codes each surface so the user always knows which
