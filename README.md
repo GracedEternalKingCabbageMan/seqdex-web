@@ -20,7 +20,7 @@ The web wallet ([`sequentia-web-wallet`](https://github.com/ConcatenaLabs/sequen
 carries the unified trading terminal; this site is the split-surface
 alternative that reads the same relays.
 
-Architecture, settlement designs, and the milestone status: [DESIGN.md](DESIGN.md).
+Architecture and settlement designs: [DESIGN.md](DESIGN.md).
 Wallet protocol: [`sequentia-extension/doc/PROVIDER.md`](https://github.com/ConcatenaLabs/sequentia-extension/blob/master/doc/PROVIDER.md).
 
 Static ES modules, no bundler, no framework. Serve the directory as-is;
